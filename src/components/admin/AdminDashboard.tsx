@@ -71,6 +71,27 @@ function osaColor(pct: number): string {
   return '#C0392B'
 }
 
+type StoreGrade = 'A' | 'B' | 'C' | 'N'
+function storeGrade(metrics: OSAMetrics, daysSince: number | null): StoreGrade {
+  if (daysSince === null) return 'N'
+  if (daysSince <= 14 && metrics.osa >= 90) return 'A'
+  if (daysSince <= 30 && metrics.osa >= 75) return 'B'
+  return 'C'
+}
+const GRADE_STYLE: Record<StoreGrade, string> = {
+  A: 'bg-abh-green text-white',
+  B: 'bg-abh-amber text-white',
+  C: 'bg-abh-red text-white',
+  N: 'bg-gray-300 text-white',
+}
+function GradeBadge({ grade }: { grade: StoreGrade }) {
+  return (
+    <span className={`text-[10px] font-bold rounded px-1.5 py-0.5 ${GRADE_STYLE[grade]}`}>
+      {grade === 'N' ? 'New' : grade}
+    </span>
+  )
+}
+
 // ---- Sub-components -----------------------------------------
 
 function OSABar({ value, size = 'md' }: { value: number; size?: 'sm' | 'md' | 'lg' }) {
@@ -156,12 +177,13 @@ function SKUTable({ rows }: { rows: StoreAvailabilitySummary[] }) {
   )
 }
 
-function DrillRowFull({ label, sub, metrics, storeCount, onClick }: {
+function DrillRowFull({ label, sub, metrics, storeCount, onClick, grade }: {
   label: string
   sub?: string
   metrics: OSAMetrics
   storeCount: number
   onClick: () => void
+  grade?: StoreGrade
 }) {
   return (
     <button
@@ -171,10 +193,13 @@ function DrillRowFull({ label, sub, metrics, storeCount, onClick }: {
     >
       <div className="flex items-center justify-between gap-3 mb-2">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-abh-navy truncate" style={{ fontFamily: 'Arial, sans-serif' }}>
-            {label}
-          </p>
-          {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
+          <div className="flex items-center gap-2 mb-0.5">
+            <p className="text-sm font-bold text-abh-navy truncate" style={{ fontFamily: 'Arial, sans-serif' }}>
+              {label}
+            </p>
+            {grade && <GradeBadge grade={grade} />}
+          </div>
+          {sub && <p className="text-[10px] text-gray-400">{sub}</p>}
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           <div className="text-right">
@@ -201,6 +226,7 @@ function StoreCard({ rows }: { rows: StoreAvailabilitySummary[] }) {
   if (rows.length === 0) return null
   const first = rows[0]
   const m = computeMetrics(rows)
+  const grade = storeGrade(m, first.days_since_visit)
 
   function backroomLabel(s: string | null): string {
     if (s === 'counted')      return 'In backroom'
@@ -215,10 +241,13 @@ function StoreCard({ rows }: { rows: StoreAvailabilitySummary[] }) {
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
         <div className="flex items-start justify-between mb-3">
           <div>
-            <p className="text-base font-bold text-abh-navy" style={{ fontFamily: 'Arial, sans-serif' }}>
-              {first.store_name}
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <div className="flex items-center gap-2 mb-0.5">
+              <p className="text-base font-bold text-abh-navy" style={{ fontFamily: 'Arial, sans-serif' }}>
+                {first.store_name}
+              </p>
+              <GradeBadge grade={grade} />
+            </div>
+            <p className="text-xs text-gray-500">
               {RETAILER_LABEL[first.retailer] ?? first.retailer}
               {first.suburb ? ` · ${first.suburb}` : ''}
               {first.state ? `, ${first.state}` : ''}
@@ -320,14 +349,24 @@ export function AdminDashboard() {
   })
 
   useEffect(() => {
-    supabase
-      .from('store_availability_summary')
-      .select('*')
-      .limit(2000)
-      .then(({ data }) => {
-        setAllRows((data ?? []) as StoreAvailabilitySummary[])
-        setLoading(false)
-      })
+    async function loadAll() {
+      const PAGE = 1000
+      let offset = 0
+      const collected: StoreAvailabilitySummary[] = []
+      while (true) {
+        const { data, error } = await supabase
+          .from('store_availability_summary')
+          .select('*')
+          .range(offset, offset + PAGE - 1)
+        if (error || !data || data.length === 0) break
+        collected.push(...(data as StoreAvailabilitySummary[]))
+        if (data.length < PAGE) break
+        offset += PAGE
+      }
+      setAllRows(collected)
+      setLoading(false)
+    }
+    loadAll()
   }, [])
 
   // Slice data to current drill context
@@ -389,9 +428,9 @@ export function AdminDashboard() {
   // States (retailer level)
   const states = useMemo(() => {
     if (!drill.retailer) return []
-    const keys = Array.from(new Set(ctxRows.map(r => r.state))).sort()
+    const keys = Array.from(new Set(ctxRows.map(r => r.state ?? 'Unknown'))).sort()
     return keys.map(state => {
-      const rows = ctxRows.filter(r => r.state === state)
+      const rows = ctxRows.filter(r => (r.state ?? 'Unknown') === state)
       return { state, rows, metrics: computeMetrics(rows), storeCount: uniqueStores(rows) }
     })
   }, [ctxRows, drill.retailer])
@@ -413,7 +452,10 @@ export function AdminDashboard() {
     return storeIds.map(storeId => {
       const rows = ctxRows.filter(r => r.store_id === storeId)
       const name = rows[0]?.store_name ?? storeId
-      return { storeId, name, rows, metrics: computeMetrics(rows) }
+      const metrics = computeMetrics(rows)
+      const daysSince = rows[0]?.days_since_visit ?? null
+      const grade = storeGrade(metrics, daysSince)
+      return { storeId, name, rows, metrics, grade }
     }).sort((a, b) => a.metrics.osa - b.metrics.osa) // worst OSA first
   }, [ctxRows, drill.city])
 
@@ -427,6 +469,25 @@ export function AdminDashboard() {
     return (
       <div className="flex items-center justify-center py-16">
         <p className="text-sm text-gray-400" style={{ fontFamily: 'Arial, sans-serif' }}>Loading…</p>
+      </div>
+    )
+  }
+
+  if (allRows.length === 0) {
+    return (
+      <div className="text-center py-16 px-6">
+        <div className="w-16 h-16 bg-abh-ltgrey rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+              d="M9 17v-2a4 4 0 014-4h0a4 4 0 014 4v2M9 17H5a2 2 0 01-2-2v-1a4 4 0 014-4h0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </div>
+        <p className="text-base font-bold text-abh-navy mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
+          No store data yet
+        </p>
+        <p className="text-sm text-gray-400 max-w-xs mx-auto" style={{ fontFamily: 'Arial, sans-serif' }}>
+          Stores need to be added and at least one shelf-check visit completed before OSA data appears here.
+        </p>
       </div>
     )
   }
@@ -546,15 +607,19 @@ export function AdminDashboard() {
           <p className="text-[11px] text-gray-400 uppercase tracking-wide font-bold px-1">
             By Store — worst OSA first
           </p>
-          {stores.map(({ storeId, name, metrics, rows }) => {
+          {stores.map(({ storeId, name, metrics, rows, grade }) => {
             const first = rows[0]
+            const daySub = first?.days_since_visit != null
+              ? `Last visited ${first.days_since_visit}d ago`
+              : 'Never visited'
             return (
               <DrillRowFull
                 key={storeId}
                 label={name}
-                sub={first?.suburb ? `${first.suburb} · Last visited ${first.days_since_visit ?? '?'}d ago` : undefined}
+                sub={first?.suburb ? `${first.suburb} · ${daySub}` : daySub}
                 metrics={metrics}
                 storeCount={1}
+                grade={grade}
                 onClick={() => drillStore(storeId, name)}
               />
             )
