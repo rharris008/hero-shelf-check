@@ -6,16 +6,16 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { loadStoreCache } from '../lib/db'
-import type { RepUser, Store } from '../types'
+import type { RepUser, Store, SKU, Retailer } from '../types'
 
 interface AuthContextValue {
   session: Session | null
   user: User | null
   repUser: RepUser | null
+  liveSKUs: SKU[]          // real SKU UUIDs from Supabase — use these for observations
   loading: boolean
-  repLoading: boolean  // true until fetchRepUser has returned at least once
-  repError: string | null  // diagnostic — Supabase error from fetchRepUser
-  storeVersion: number     // increments after each store sync — triggers StorePicker re-search
+  repLoading: boolean
+  storeVersion: number
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   acceptTerms: () => Promise<void>
@@ -26,9 +26,9 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [repUser, setRepUser] = useState<RepUser | null>(null)
+  const [liveSKUs, setLiveSKUs] = useState<SKU[]>([])
   const [loading, setLoading] = useState(true)
   const [repLoading, setRepLoading] = useState(false)
-  const [repError, setRepError] = useState<string | null>(null)
   const [storeVersion, setStoreVersion] = useState(0)
 
   useEffect(() => {
@@ -59,16 +59,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   async function syncReferenceData() {
-    const { data, error } = await supabase
-      .from('stores')
-      .select('id, retailer, store_number, name, address_line1, suburb, state, postcode, latitude, longitude, is_active')
-      .eq('is_active', true)
-      .order('name')
-    console.log('[sync] stores fetched:', data?.length, '| error:', error?.message ?? 'none',
-      '| retailers:', (data as Array<{ retailer: string }> | null)?.map(s => s.retailer).join(','))
-    if (data && data.length > 0) {
-      await loadStoreCache(data as Store[])
+    const [storeRes, skuRes] = await Promise.all([
+      supabase
+        .from('stores')
+        .select('id, retailer, store_number, name, address_line1, suburb, state, postcode, latitude, longitude, is_active')
+        .eq('is_active', true)
+        .order('name'),
+      supabase
+        .from('skus')
+        .select('id, code, name, retailers')
+        .eq('is_active', true)
+        .order('name'),
+    ])
+    if (storeRes.data && storeRes.data.length > 0) {
+      await loadStoreCache(storeRes.data as Store[])
       setStoreVersion(v => v + 1)
+    }
+    if (skuRes.data && skuRes.data.length > 0) {
+      setLiveSKUs(
+        (skuRes.data as Array<{ id: string; code: string; name: string; retailers: string[] }>)
+          .map(s => ({ ...s, retailers: s.retailers as Retailer[] }))
+      )
     }
   }
 
@@ -79,11 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .eq('id', userId)
       .maybeSingle()
     if (error) {
-      setRepError(`${error.code}: ${error.message}`)
-    } else if (!data) {
-      setRepError(`No row found for id=${userId}`)
-    } else {
-      setRepError(null)
+      console.error('[auth] fetchRepUser error:', error.code, error.message)
     }
     setRepUser(data as RepUser | null)
     setRepLoading(false)
@@ -116,9 +123,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       user: session?.user ?? null,
       repUser,
+      liveSKUs,
       loading,
       repLoading,
-      repError,
       storeVersion,
       signIn,
       signOut,

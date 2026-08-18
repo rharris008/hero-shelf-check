@@ -8,7 +8,7 @@ import React, { useState } from 'react'
 import { StorePicker } from '../stores/StorePicker'
 import { useAuth } from '../../contexts/AuthContext'
 import { enqueue } from '../../lib/db'
-import type { Store, SkuObservation, BackroomStatus, Retailer } from '../../types'
+import type { Store, SKU, SkuObservation, BackroomStatus, Retailer } from '../../types'
 import { HERO_SKUS } from '../../types'
 
 async function compressImage(file: File): Promise<string> {
@@ -56,16 +56,19 @@ function uuid(): string {
 }
 
 export function VisitForm() {
-  const { repUser } = useAuth()
+  const { repUser, liveSKUs } = useAuth()
   const [store, setStore] = useState<Store | null>(null)
   const [observations, setObservations] = useState<Map<string, SkuObservation>>(new Map())
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
+  // Use live UUIDs from Supabase; fall back to hardcoded constants if offline/not yet loaded
+  const activeSKUs: SKU[] = liveSKUs.length > 0 ? liveSKUs : HERO_SKUS
+
   // Filter SKUs to those relevant to the selected store's retailer
   const visibleSkus = store
-    ? HERO_SKUS.filter(s => s.retailers.includes(store.retailer as Retailer))
-    : HERO_SKUS
+    ? activeSKUs.filter(s => s.retailers.includes(store.retailer as Retailer))
+    : activeSKUs
 
   function updateObs(skuId: string, patch: Partial<SkuObservation>) {
     setObservations(prev => {
