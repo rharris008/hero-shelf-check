@@ -465,6 +465,25 @@ export function AdminDashboard() {
     return allRows.filter(r => r.store_id === drill.storeId)
   }, [allRows, drill.storeId])
 
+  // Top 5 priority stores nationally: OOS + no backroom (lost sales), then overdue
+  const topPriorityStores = useMemo(() => {
+    const storeIds = Array.from(new Set(allRows.map(r => r.store_id)))
+    return storeIds
+      .map(sid => {
+        const rows = allRows.filter(r => r.store_id === sid)
+        const first = rows[0]
+        const lostSaleSkus = rows.filter(r => r.latest_shelf_units === 0 && r.latest_backroom_status === 'none_present')
+        const oosSkus = rows.filter(r => r.latest_shelf_units === 0)
+        const overdue = first?.days_since_visit != null && first.days_since_visit > 30
+        const neverVisited = first?.last_visit_date === null
+        const score = lostSaleSkus.length * 100 + oosSkus.length * 10 + (overdue ? 5 : 0) + (neverVisited ? 1 : 0)
+        return { sid, name: first?.store_name ?? sid, retailer: first?.retailer ?? '', suburb: first?.suburb ?? '', state: first?.state ?? '', lostSaleSkus, oosSkus, days: first?.days_since_visit ?? null, score }
+      })
+      .filter(s => s.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+  }, [allRows])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -550,21 +569,57 @@ export function AdminDashboard() {
 
       {/* ---- Level-specific drill lists ---- */}
 
-      {/* National: by retailer */}
+      {/* National: top priorities + by retailer */}
       {drill.level === 'national' && (
-        <div className="space-y-2">
-          <p className="text-[11px] text-gray-400 uppercase tracking-wide font-bold px-1">By Retailer</p>
-          {retailers.map(({ retailer, metrics, storeCount }) => (
-            <DrillRowFull
-              key={retailer}
-              label={RETAILER_LABEL[retailer] ?? retailer}
-              sub={`${storeCount} ${storeCount === 1 ? 'store' : 'stores'}`}
-              metrics={metrics}
-              storeCount={storeCount}
-              onClick={() => drillRetailer(retailer as Retailer)}
-            />
-          ))}
-        </div>
+        <>
+          {topPriorityStores.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[11px] text-gray-400 uppercase tracking-wide font-bold px-1">Top Priorities</p>
+              {topPriorityStores.map(store => (
+                <div key={store.sid}
+                     className="bg-white rounded-xl shadow-sm border-l-4 border-abh-red p-4">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-abh-navy truncate" style={{ fontFamily: 'Arial, sans-serif' }}>
+                        {store.name}
+                      </p>
+                      <p className="text-[10px] text-gray-400">
+                        {RETAILER_LABEL[store.retailer] ?? store.retailer}
+                        {store.suburb ? ` · ${store.suburb}` : ''}
+                        {store.state ? `, ${store.state}` : ''}
+                        {store.days !== null ? ` · ${store.days}d ago` : ' · Never visited'}
+                      </p>
+                    </div>
+                  </div>
+                  {store.lostSaleSkus.length > 0 && (
+                    <p className="text-[11px] text-abh-red font-semibold">
+                      Lost sale: {store.lostSaleSkus.map(r => r.sku_name).join(', ')}
+                    </p>
+                  )}
+                  {store.oosSkus.filter(r => r.latest_backroom_status !== 'none_present').length > 0 && (
+                    <p className="text-[11px] text-abh-amber font-semibold">
+                      OOS: {store.oosSkus.filter(r => r.latest_backroom_status !== 'none_present').map(r => r.sku_name).join(', ')}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <p className="text-[11px] text-gray-400 uppercase tracking-wide font-bold px-1">By Retailer</p>
+            {retailers.map(({ retailer, metrics, storeCount }) => (
+              <DrillRowFull
+                key={retailer}
+                label={RETAILER_LABEL[retailer] ?? retailer}
+                sub={`${storeCount} ${storeCount === 1 ? 'store' : 'stores'}`}
+                metrics={metrics}
+                storeCount={storeCount}
+                onClick={() => drillRetailer(retailer as Retailer)}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       {/* Retailer: by state */}

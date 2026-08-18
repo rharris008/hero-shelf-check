@@ -16,6 +16,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [termsAgreed, setTermsAgreed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -26,6 +27,7 @@ export function LoginPage() {
     setPassword('')
     setConfirmPassword('')
     setFullName('')
+    setTermsAgreed(false)
   }
 
   async function handleLogin(e: React.FormEvent) {
@@ -214,10 +216,27 @@ export function LoginPage() {
                 className={inputClass} style={font} />
             </div>
 
+            {/* T&Cs agreement */}
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={termsAgreed}
+                onChange={e => setTermsAgreed(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-abh-mdgrey accent-abh-navy flex-shrink-0"
+              />
+              <span className="text-xs text-gray-600" style={font}>
+                I have read and agree to the{' '}
+                <a href="#/terms" target="_blank" rel="noopener noreferrer"
+                   className="text-abh-blue underline hover:text-abh-navy">
+                  Terms of Use
+                </a>
+              </span>
+            </label>
+
             {error && <p className="text-sm text-abh-red bg-red-50 rounded-lg px-3 py-2" style={font}>{error}</p>}
             {info  && <p className="text-sm text-abh-green bg-green-50 rounded-lg px-3 py-2" style={font}>{info}</p>}
 
-            <button type="submit" disabled={loading}
+            <button type="submit" disabled={loading || !termsAgreed}
               className="w-full bg-abh-navy text-white font-semibold rounded-lg py-3 text-sm hover:bg-opacity-90 disabled:opacity-50 transition-colors"
               style={font}>
               {loading ? 'Creating...' : 'Create account'}

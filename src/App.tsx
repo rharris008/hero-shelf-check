@@ -64,23 +64,21 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 
 function RequireAdmin({ children }: { children: React.ReactNode }) {
-  const { repUser, repLoading, session } = useAuth()
+  const { repUser, repLoading } = useAuth()
   if (repLoading) return null
   if (!repUser || repUser.role !== 'admin') {
-    const debug = (() => { try { return JSON.parse(localStorage.getItem('__shelf_repuser_debug') ?? 'null') } catch { return null } })()
     return (
       <div className="text-center py-16 px-6" style={{ fontFamily: 'Arial, sans-serif' }}>
+        <div className="w-14 h-14 bg-abh-ltgrey rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        </div>
         <p className="text-sm font-bold text-abh-navy mb-1">Admin access required</p>
-        <p className="text-xs text-gray-400 mb-3">Contact your manager to request dashboard access.</p>
-        {session && (
-          <div className="text-left bg-gray-50 rounded-lg p-3 text-xs text-gray-500 font-mono break-all">
-            <p>auth uid: {session.user.id}</p>
-            <p>repUser: {repUser ? JSON.stringify(repUser) : 'null'}</p>
-            {debug && <p>last fetch uid: {debug.userId}</p>}
-            {debug && <p>fetch result: {debug.data ? 'row found' : 'null'}</p>}
-            {debug && debug.errorCode && <p>error: {debug.errorCode}</p>}
-          </div>
-        )}
+        <p className="text-xs text-gray-400 max-w-xs mx-auto">
+          This area is restricted to administrators. Contact your manager to request access.
+        </p>
       </div>
     )
   }

@@ -348,17 +348,31 @@ export function GuestReportPage() {
               {!isOos && (
                 <div className="px-4 py-3 border-t border-gray-100">
                   <label className="text-xs text-gray-500 block mb-2">Units on shelf</label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min="0"
-                    max="999"
-                    value={shelfUnits}
-                    onChange={e => setShelfUnits(e.target.value)}
-                    placeholder="0"
-                    className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-lg font-bold text-center
-                               focus:outline-none focus:ring-2 focus:ring-abh-blue"
-                  />
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShelfUnits(u => String(Math.max(0, parseInt(u || '0', 10) - 1)))}
+                      className="w-10 h-10 rounded-full bg-gray-100 text-xl font-bold text-abh-navy
+                                 flex items-center justify-center hover:bg-gray-200 active:bg-gray-300"
+                    >−</button>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      max="999"
+                      value={shelfUnits}
+                      onChange={e => setShelfUnits(e.target.value)}
+                      placeholder="0"
+                      className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-lg font-bold text-center
+                                 focus:outline-none focus:ring-2 focus:ring-abh-blue"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShelfUnits(u => String(parseInt(u || '0', 10) + 1))}
+                      className="w-10 h-10 rounded-full bg-abh-navy text-xl font-bold text-white
+                                 flex items-center justify-center hover:bg-opacity-80 active:bg-opacity-70"
+                    >+</button>
+                  </div>
                 </div>
               )}
             </div>
