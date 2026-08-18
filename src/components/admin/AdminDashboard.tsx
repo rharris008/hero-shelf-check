@@ -576,8 +576,12 @@ export function AdminDashboard() {
             <div className="space-y-2">
               <p className="text-[11px] text-gray-400 uppercase tracking-wide font-bold px-1">Top Priorities</p>
               {topPriorityStores.map(store => (
-                <div key={store.sid}
-                     className="bg-white rounded-xl shadow-sm border-l-4 border-abh-red p-4">
+                <button
+                  key={store.sid}
+                  onClick={() => drillStore(store.sid, store.name)}
+                  className="w-full bg-white rounded-xl shadow-sm border-l-4 border-abh-red p-4 text-left
+                             hover:shadow-md hover:border-red-600 active:scale-[0.99] transition-all"
+                >
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold text-abh-navy truncate" style={{ fontFamily: 'Arial, sans-serif' }}>
@@ -590,6 +594,7 @@ export function AdminDashboard() {
                         {store.days !== null ? ` · ${store.days}d ago` : ' · Never visited'}
                       </p>
                     </div>
+                    <span className="text-abh-blue text-sm flex-shrink-0">›</span>
                   </div>
                   {store.lostSaleSkus.length > 0 && (
                     <p className="text-[11px] text-abh-red font-semibold">
@@ -601,7 +606,7 @@ export function AdminDashboard() {
                       OOS: {store.oosSkus.filter(r => r.latest_backroom_status !== 'none_present').map(r => r.sku_name).join(', ')}
                     </p>
                   )}
-                </div>
+                </button>
               ))}
             </div>
           )}

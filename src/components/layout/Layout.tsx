@@ -61,12 +61,53 @@ export function Layout() {
   const isAdmin = repUser?.role === 'admin'
 
   const navLinks = [
-    { to: '/check',   label: 'Check'     },
-    { to: '/route',   label: 'Route'     },
-    { to: '/history', label: 'History'   },
+    {
+      to: '/check', label: 'Check',
+      icon: (active: boolean) => (
+        <svg className={`w-5 h-5 mx-auto ${active ? 'text-white' : 'text-blue-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+        </svg>
+      ),
+    },
+    {
+      to: '/route', label: 'Route',
+      icon: (active: boolean) => (
+        <svg className={`w-5 h-5 mx-auto ${active ? 'text-white' : 'text-blue-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+    },
+    {
+      to: '/history', label: 'History',
+      icon: (active: boolean) => (
+        <svg className={`w-5 h-5 mx-auto ${active ? 'text-white' : 'text-blue-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+    },
     ...(isAdmin ? [
-      { to: '/admin', label: 'OSA'   },
-      { to: '/reps',  label: 'Reps'  },
+      {
+        to: '/admin', label: 'OSA',
+        icon: (active: boolean) => (
+          <svg className={`w-5 h-5 mx-auto ${active ? 'text-white' : 'text-blue-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        ),
+      },
+      {
+        to: '/reps', label: 'Reps',
+        icon: (active: boolean) => (
+          <svg className={`w-5 h-5 mx-auto ${active ? 'text-white' : 'text-blue-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+              d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+        ),
+      },
     ] : []),
   ]
 
@@ -155,19 +196,23 @@ export function Layout() {
 
         {/* Nav tabs */}
         <nav className="flex border-t border-white border-opacity-20 max-w-2xl mx-auto w-full">
-          {navLinks.map(link => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className={`flex-1 text-center py-2.5 text-sm font-medium transition-colors ${
-                location.pathname.startsWith(link.to)
-                  ? 'text-white border-b-2 border-abh-blue'
-                  : 'text-blue-200 hover:text-white'
-              }`}
-            >
-              {link.label}
-            </Link>
-          ))}
+          {navLinks.map(link => {
+            const active = location.pathname.startsWith(link.to)
+            return (
+              <Link
+                key={link.to}
+                to={link.to}
+                className={`flex-1 flex flex-col items-center justify-center py-2 transition-colors ${
+                  active ? 'text-white border-b-2 border-abh-blue' : 'text-blue-200 hover:text-white'
+                }`}
+              >
+                {link.icon(active)}
+                <span className={`text-[10px] font-medium mt-0.5 ${active ? 'text-white' : 'text-blue-300'}`}>
+                  {link.label}
+                </span>
+              </Link>
+            )
+          })}
         </nav>
       </header>
 
