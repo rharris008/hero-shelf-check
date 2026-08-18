@@ -57,11 +57,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   async function syncReferenceData() {
-    const CACHE_KEY = 'store_cache_synced_at'
-    const last = localStorage.getItem(CACHE_KEY)
-    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000
-    if (last && Number(last) > oneDayAgo) return  // already synced today
-
     const { data } = await supabase
       .from('stores')
       .select('id, retailer, store_number, name, address_line1, suburb, state, postcode, latitude, longitude, is_active')
@@ -69,7 +64,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .order('name')
     if (data && data.length > 0) {
       await loadStoreCache(data as Store[])
-      localStorage.setItem(CACHE_KEY, String(Date.now()))
     }
   }
 
