@@ -96,9 +96,12 @@ export interface StoreAvailabilitySummary {
   state: string
   last_visit_date: string | null
   days_since_visit: number | null
+  last_rep_name: string | null
   sku_id: string
   sku_name: string
   latest_shelf_units: number | null
+  latest_backroom_status: string | null
+  latest_photo_url: string | null
   visits_last_30d: number
   avg_shelf_units_30d: number | null
 }
