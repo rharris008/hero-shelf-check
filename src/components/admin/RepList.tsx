@@ -98,6 +98,16 @@ export function RepList() {
     return 'bg-abh-red/10 text-abh-red'
   }
 
+  const [copied, setCopied] = useState(false)
+  const signupUrl = window.location.origin + window.location.pathname
+
+  function copyInviteLink() {
+    navigator.clipboard.writeText(signupUrl).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -106,18 +116,44 @@ export function RepList() {
     )
   }
 
+  const activeThisWeek = reps.filter(r => {
+    const a = activity.get(r.id)
+    if (!a?.last_visit) return false
+    return Math.floor((Date.now() - new Date(a.last_visit).getTime()) / 86400000) <= 7
+  }).length
+  const termsPending = reps.filter(r => !r.terms_accepted_at).length
+
   return (
     <div className="space-y-3" style={{ fontFamily: 'Arial, sans-serif' }}>
+      {/* Summary tile */}
       <div className="bg-abh-navy rounded-xl p-4 text-white">
         <p className="text-[11px] text-blue-200 uppercase tracking-wide mb-0.5">Rep Management</p>
         <p className="text-3xl font-bold">{reps.length}</p>
-        <p className="text-xs text-blue-300 mt-0.5">
-          {reps.filter(r => {
-            const a = activity.get(r.id)
-            if (!a?.last_visit) return false
-            return Math.floor((Date.now() - new Date(a.last_visit).getTime()) / 86400000) <= 7
-          }).length} active this week
-        </p>
+        <div className="flex gap-3 mt-1">
+          <p className="text-xs text-blue-300">{activeThisWeek} active this week</p>
+          {termsPending > 0 && (
+            <p className="text-xs text-abh-amber">{termsPending} terms pending</p>
+          )}
+        </div>
+      </div>
+
+      {/* Invite link */}
+      <div className="bg-white rounded-xl border border-abh-mdgrey p-4">
+        <p className="text-xs font-bold text-abh-navy mb-1">Invite a rep</p>
+        <p className="text-[11px] text-gray-500 mb-2">Share this link. They sign up, accept terms, and appear below.</p>
+        <div className="flex gap-2">
+          <p className="flex-1 text-[11px] text-gray-400 bg-abh-ltgrey rounded-lg px-3 py-2 truncate">
+            {signupUrl}
+          </p>
+          <button
+            onClick={copyInviteLink}
+            className={`text-xs font-bold rounded-lg px-3 py-2 flex-shrink-0 transition-colors ${
+              copied ? 'bg-abh-green text-white' : 'bg-abh-navy text-white hover:bg-opacity-80'
+            }`}
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
       </div>
 
       {reps.map(rep => {

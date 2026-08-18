@@ -199,8 +199,29 @@ export function VisitForm() {
     )
   }
 
+  // Progress: step 1 = pick store, step 2 = count SKUs
+  const step = !store ? 1 : 2
+  const totalSteps = 2
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Progress indicator */}
+      <div className="flex items-center gap-2 px-1" style={{ fontFamily: 'Arial, sans-serif' }}>
+        {Array.from({ length: totalSteps }, (_, i) => i + 1).map(s => (
+          <React.Fragment key={s}>
+            <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold flex-shrink-0 ${
+              s < step ? 'bg-abh-green text-white' : s === step ? 'bg-abh-navy text-white' : 'bg-abh-mdgrey text-white'
+            }`}>
+              {s < step ? '✓' : s}
+            </div>
+            <span className={`text-xs ${s === step ? 'font-bold text-abh-navy' : 'text-gray-400'}`}>
+              {s === 1 ? 'Select store' : 'Count SKUs'}
+            </span>
+            {s < totalSteps && <div className="flex-1 h-px bg-abh-mdgrey" />}
+          </React.Fragment>
+        ))}
+      </div>
+
       {/* Step 1: Store */}
       <section className="bg-white rounded-xl p-4 shadow-sm">
         <h2 className="font-bold text-abh-navy mb-3 text-sm uppercase tracking-wide" style={{ fontFamily: 'Arial, sans-serif' }}>
