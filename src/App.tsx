@@ -42,7 +42,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 }
 
 function AccessPendingScreen() {
-  const { signOut } = useAuth()
+  const { signOut, repError } = useAuth()
   return (
     <div className="min-h-screen bg-abh-navy flex flex-col items-center justify-center px-6 text-center"
          style={{ fontFamily: 'Arial, sans-serif' }}>
@@ -60,6 +60,11 @@ function AccessPendingScreen() {
       >
         Sign out
       </button>
+      {repError && (
+        <p className="mt-4 text-xs text-red-300 bg-black/30 rounded px-3 py-2 max-w-xs break-all">
+          {repError}
+        </p>
+      )}
     </div>
   )
 }

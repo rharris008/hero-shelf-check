@@ -14,6 +14,7 @@ interface AuthContextValue {
   repUser: RepUser | null
   loading: boolean
   repLoading: boolean  // true until fetchRepUser has returned at least once
+  repError: string | null  // diagnostic — Supabase error from fetchRepUser
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   acceptTerms: () => Promise<void>
@@ -26,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [repUser, setRepUser] = useState<RepUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [repLoading, setRepLoading] = useState(false)
+  const [repError, setRepError] = useState<string | null>(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -72,11 +74,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function fetchRepUser(userId: string) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('rep_users')
       .select('*')
       .eq('id', userId)
-      .single()
+      .maybeSingle()
+    if (error) {
+      setRepError(`${error.code}: ${error.message}`)
+    } else if (!data) {
+      setRepError(`No row found for id=${userId}`)
+    } else {
+      setRepError(null)
+    }
     setRepUser(data as RepUser | null)
     setRepLoading(false)
   }
@@ -109,6 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       repUser,
       loading,
       repLoading,
+      repError,
       signIn,
       signOut,
       acceptTerms,
