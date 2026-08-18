@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { searchStores } from '../../lib/db'
+import { useAuth } from '../../contexts/AuthContext'
 import type { Store, Retailer } from '../../types'
 
 const RETAILER_LABELS: Record<Retailer, string> = {
@@ -26,6 +27,7 @@ interface StorePickerProps {
 }
 
 export function StorePicker({ onSelect, retailerFilter }: StorePickerProps) {
+  const { storeVersion } = useAuth()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Store[]>([])
   const [selected, setSelected] = useState<Store | null>(null)
@@ -43,8 +45,8 @@ export function StorePicker({ onSelect, retailerFilter }: StorePickerProps) {
     return () => clearTimeout(t)
   }, [query, doSearch])
 
-  // Load initial list on mount
-  useEffect(() => { doSearch('') }, [doSearch])
+  // Re-search when store cache is updated (after syncReferenceData completes)
+  useEffect(() => { doSearch(query) }, [storeVersion])
 
   function handleSelect(store: Store) {
     setSelected(store)

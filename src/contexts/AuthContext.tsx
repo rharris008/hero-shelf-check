@@ -15,6 +15,7 @@ interface AuthContextValue {
   loading: boolean
   repLoading: boolean  // true until fetchRepUser has returned at least once
   repError: string | null  // diagnostic — Supabase error from fetchRepUser
+  storeVersion: number     // increments after each store sync — triggers StorePicker re-search
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   acceptTerms: () => Promise<void>
@@ -28,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [repLoading, setRepLoading] = useState(false)
   const [repError, setRepError] = useState<string | null>(null)
+  const [storeVersion, setStoreVersion] = useState(0)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -64,6 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .order('name')
     if (data && data.length > 0) {
       await loadStoreCache(data as Store[])
+      setStoreVersion(v => v + 1)
     }
   }
 
@@ -113,6 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       repLoading,
       repError,
+      storeVersion,
       signIn,
       signOut,
       acceptTerms,
