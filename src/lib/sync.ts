@@ -5,7 +5,20 @@
 
 import { supabase } from './supabase'
 import { getQueue, dequeue, markAttempt } from './db'
-import type { OfflineQueueItem } from '../types'
+import type { OfflineQueueItem, SkuObservation } from '../types'
+
+async function uploadPhoto(visitId: string, skuId: string, blob: string): Promise<string | null> {
+  const base64 = blob.replace(/^data:image\/\w+;base64,/, '')
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  const path = `${visitId}/${skuId}.jpg`
+  const { error } = await supabase.storage
+    .from('shelf-photos')
+    .upload(path, bytes, { contentType: 'image/jpeg', upsert: true })
+  if (error) { console.error('[Sync] Photo upload failed:', error); return null }
+  return path
+}
 
 const SYNC_INTERVAL_MS = 60_000
 const MAX_ATTEMPTS = 5
@@ -49,14 +62,23 @@ async function uploadVisit(item: OfflineQueueItem): Promise<boolean> {
       throw visitErr
     }
 
-    // 2. Insert all observations for this visit
-    const obsRows = visit.observations.map(o => ({
+    // 2. Upload any queued photos, then insert observations
+    const resolvedObs: SkuObservation[] = await Promise.all(
+      visit.observations.map(async o => {
+        if (!o.photo_blob) return o
+        const path = await uploadPhoto(visit.id, o.sku_id, o.photo_blob)
+        return { ...o, photo_blob: null, photo_url: path }
+      })
+    )
+
+    const obsRows = resolvedObs.map(o => ({
       visit_id: visitData.id,
       sku_id: o.sku_id,
       shelf_units: o.shelf_units,
       backroom_status: o.backroom_status,
       backroom_units: o.backroom_units ?? null,
       notes: o.notes || null,
+      photo_url: o.photo_url ?? null,
     }))
 
     const { error: obsErr } = await supabase.from('observations').insert(obsRows)

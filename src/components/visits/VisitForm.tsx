@@ -11,6 +11,24 @@ import { enqueue } from '../../lib/db'
 import type { Store, SkuObservation, BackroomStatus, Retailer } from '../../types'
 import { HERO_SKUS } from '../../types'
 
+async function compressImage(file: File): Promise<string> {
+  return new Promise(resolve => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const MAX_W = 800
+      const scale = Math.min(1, MAX_W / img.width)
+      const canvas = document.createElement('canvas')
+      canvas.width  = Math.round(img.width  * scale)
+      canvas.height = Math.round(img.height * scale)
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+      resolve(canvas.toDataURL('image/jpeg', 0.80))
+    }
+    img.src = url
+  })
+}
+
 const BACKROOM_OPTIONS: { value: BackroomStatus; label: string }[] = [
   { value: 'counted',       label: 'Counted' },
   { value: 'none_present',  label: 'None present' },
@@ -224,6 +242,57 @@ export function VisitForm() {
                     style={{ fontFamily: 'Arial, sans-serif' }}
                     placeholder="E.g. facing only, out-of-stock tag, wrong bay..."
                   />
+                </div>
+
+                {/* Photo capture */}
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-500 mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
+                    Photo (optional)
+                  </label>
+                  {obs?.photo_blob ? (
+                    <div className="relative">
+                      <img
+                        src={obs.photo_blob}
+                        alt="Shelf"
+                        className="w-full h-36 object-cover rounded-lg border border-abh-mdgrey"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => updateObs(sku.id, { photo_blob: null })}
+                        className="absolute top-1 right-1 bg-abh-red text-white rounded-full w-6 h-6
+                                   flex items-center justify-center text-xs font-bold leading-none"
+                        aria-label="Remove photo"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex items-center justify-center gap-2 border-2 border-dashed
+                                      border-abh-mdgrey rounded-lg p-3 cursor-pointer
+                                      hover:border-abh-blue transition-colors">
+                      <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span className="text-xs text-gray-500" style={{ fontFamily: 'Arial, sans-serif' }}>
+                        Take photo
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={async e => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          const blob = await compressImage(file)
+                          updateObs(sku.id, { photo_blob: blob })
+                          e.target.value = ''
+                        }}
+                      />
+                    </label>
+                  )}
                 </div>
               </div>
             )

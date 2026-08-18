@@ -64,6 +64,8 @@ export interface SkuObservation {
   backroom_status: BackroomStatus
   backroom_units: number | null  // only set when backroom_status === 'counted'
   notes: string
+  photo_blob?: string | null   // base64 JPEG held in offline queue until uploaded
+  photo_url?: string | null    // Supabase Storage path set after successful upload
 }
 
 export interface Visit {
