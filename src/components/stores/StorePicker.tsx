@@ -1,12 +1,11 @@
 // ============================================================
 // StorePicker — searchable store selector
-// Reference list only: no free-text entry for store names.
-// Search by store name, suburb, postcode, or store number.
+// Queries Supabase directly (not IndexedDB) so it always
+// reflects the live store list regardless of cache state.
 // ============================================================
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { searchStores } from '../../lib/db'
-import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
 import type { Store, Retailer } from '../../types'
 
 const RETAILER_LABELS: Record<Retailer, string> = {
@@ -27,26 +26,48 @@ interface StorePickerProps {
 }
 
 export function StorePicker({ onSelect, retailerFilter }: StorePickerProps) {
-  const { storeVersion } = useAuth()
+  const [allStores, setAllStores] = useState<Store[]>([])
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Store[]>([])
   const [selected, setSelected] = useState<Store | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  const doSearch = useCallback(async (q: string) => {
-    setLoading(true)
-    const stores = await searchStores(q, retailerFilter)
-    setResults(stores)
-    setLoading(false)
+  // Fetch all active stores from Supabase on mount
+  useEffect(() => {
+    let q = supabase
+      .from('stores')
+      .select('id, retailer, store_number, name, address_line1, suburb, state, postcode, latitude, longitude, is_active')
+      .eq('is_active', true)
+      .order('name')
+    if (retailerFilter) q = q.eq('retailer', retailerFilter)
+
+    q.then(({ data }) => {
+      setAllStores((data ?? []) as Store[])
+      setLoading(false)
+    })
   }, [retailerFilter])
 
+  const doSearch = useCallback((q: string) => {
+    const term = q.toLowerCase().trim()
+    if (!term) {
+      setResults(allStores.slice(0, 50))
+      return
+    }
+    setResults(
+      allStores.filter(s =>
+        s.name.toLowerCase().includes(term) ||
+        s.suburb.toLowerCase().includes(term) ||
+        (s.postcode ?? '').includes(term) ||
+        s.store_number.toLowerCase().includes(term)
+      ).slice(0, 50)
+    )
+  }, [allStores])
+
+  // Re-filter when query or store list changes
   useEffect(() => {
-    const t = setTimeout(() => doSearch(query), 200)
+    const t = setTimeout(() => doSearch(query), 150)
     return () => clearTimeout(t)
   }, [query, doSearch])
-
-  // Re-search when store cache is updated (after syncReferenceData completes)
-  useEffect(() => { doSearch(query) }, [storeVersion])
 
   function handleSelect(store: Store) {
     setSelected(store)
@@ -58,7 +79,6 @@ export function StorePicker({ onSelect, retailerFilter }: StorePickerProps) {
   return (
     <div className="space-y-3">
       {selected ? (
-        // Selected state: show store card with change button
         <div className="flex items-start justify-between bg-white rounded-xl border-2 border-abh-blue p-4 shadow-sm">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -83,24 +103,19 @@ export function StorePicker({ onSelect, retailerFilter }: StorePickerProps) {
           </button>
         </div>
       ) : (
-        // Search state
         <div>
           <input
             type="search"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search by store name, suburb or postcode..."
+            placeholder={loading ? 'Loading stores...' : `Search ${allStores.length} stores...`}
+            disabled={loading}
             className="w-full border border-abh-mdgrey rounded-xl px-4 py-3 text-sm
-                       focus:outline-none focus:ring-2 focus:ring-abh-blue bg-white shadow-sm"
+                       focus:outline-none focus:ring-2 focus:ring-abh-blue bg-white shadow-sm
+                       disabled:opacity-50"
             style={{ fontFamily: 'Arial, sans-serif' }}
             autoFocus
           />
-
-          {loading && (
-            <p className="text-center text-sm text-gray-400 mt-3" style={{ fontFamily: 'Arial, sans-serif' }}>
-              Searching...
-            </p>
-          )}
 
           {!loading && results.length === 0 && query.length > 1 && (
             <p className="text-center text-sm text-gray-400 mt-3" style={{ fontFamily: 'Arial, sans-serif' }}>
