@@ -1,27 +1,84 @@
 // ============================================================
-// LoginPage — email/password login screen
+// LoginPage — sign in / forgot password / create account
 // ABH Navy branding, Arial font
 // ============================================================
 
 import React, { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
+
+type Mode = 'login' | 'forgot' | 'signup'
 
 export function LoginPage() {
   const { signIn } = useAuth()
+  const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  async function handleSubmit(e: React.FormEvent) {
+  function reset() {
+    setError(null)
+    setInfo(null)
+    setPassword('')
+    setConfirmPassword('')
+  }
+
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
-
     const { error } = await signIn(email.trim(), password)
     if (error) setError(error)
     setLoading(false)
   }
+
+  async function handleForgot(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: window.location.origin + window.location.pathname + '#/reset-password',
+    })
+    if (error) {
+      setError(error.message)
+    } else {
+      setInfo('Password reset link sent. Check your email.')
+    }
+    setLoading(false)
+  }
+
+  async function handleSignup(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.')
+      return
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.')
+      return
+    }
+    setLoading(true)
+    const { error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+    })
+    if (error) {
+      setError(error.message)
+    } else {
+      setInfo('Account created. Check your email to verify, then contact your manager to activate access.')
+      setMode('login')
+      setPassword('')
+      setConfirmPassword('')
+    }
+    setLoading(false)
+  }
+
+  const inputClass = "w-full border border-abh-mdgrey rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-abh-blue"
+  const font = { fontFamily: 'Arial, sans-serif' }
 
   return (
     <div className="min-h-screen bg-abh-navy flex flex-col items-center justify-center px-4">
@@ -33,11 +90,11 @@ export function LoginPage() {
           className="h-10 object-contain brightness-0 invert"
         />
         <div className="bg-white rounded-lg px-2 py-1">
-        <img
+          <img
           src="data:image/jpeg;base64,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"
           alt="Australian Beverage Holdings"
           className="h-7 object-contain"
-        />
+          />
         </div>
       </div>
 
@@ -51,69 +108,114 @@ export function LoginPage() {
         />
       </div>
 
-            {/* Login card */}
+      {/* Card */}
       <div className="w-full max-w-sm bg-white rounded-xl shadow-xl p-6">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-abh-dktext mb-1"
-              style={{ fontFamily: 'Arial, sans-serif' }}
-            >
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="w-full border border-abh-mdgrey rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-abh-blue"
-              style={{ fontFamily: 'Arial, sans-serif' }}
-              placeholder="your@email.com"
-            />
-          </div>
 
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-abh-dktext mb-1"
-              style={{ fontFamily: 'Arial, sans-serif' }}
-            >
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="w-full border border-abh-mdgrey rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-abh-blue"
-              style={{ fontFamily: 'Arial, sans-serif' }}
-            />
-          </div>
+        {/* ---- Sign in ---- */}
+        {mode === 'login' && (
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-abh-dktext mb-1" style={font}>Email</label>
+              <input id="email" type="email" autoComplete="email" required
+                value={email} onChange={e => setEmail(e.target.value)}
+                className={inputClass} style={font} placeholder="your@email.com" />
+            </div>
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-abh-dktext mb-1" style={font}>Password</label>
+              <input id="password" type="password" autoComplete="current-password" required
+                value={password} onChange={e => setPassword(e.target.value)}
+                className={inputClass} style={font} />
+            </div>
 
-          {error && (
-            <p className="text-sm text-abh-red bg-red-50 rounded-lg px-3 py-2" style={{ fontFamily: 'Arial, sans-serif' }}>
-              {error}
-            </p>
-          )}
+            {error && <p className="text-sm text-abh-red bg-red-50 rounded-lg px-3 py-2" style={font}>{error}</p>}
+            {info  && <p className="text-sm text-abh-green bg-green-50 rounded-lg px-3 py-2" style={font}>{info}</p>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-abh-navy text-white font-semibold rounded-lg py-3 text-sm
-                       hover:bg-opacity-90 active:bg-opacity-80 disabled:opacity-50
-                       transition-colors"
-            style={{ fontFamily: 'Arial, sans-serif' }}
-          >
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
-        </form>
+            <button type="submit" disabled={loading}
+              className="w-full bg-abh-navy text-white font-semibold rounded-lg py-3 text-sm hover:bg-opacity-90 active:bg-opacity-80 disabled:opacity-50 transition-colors"
+              style={font}>
+              {loading ? 'Signing in...' : 'Sign in'}
+            </button>
 
-        <p className="text-center text-xs text-gray-400 mt-4" style={{ fontFamily: 'Arial, sans-serif' }}>
+            <div className="flex justify-between pt-1">
+              <button type="button" onClick={() => { reset(); setMode('forgot') }}
+                className="text-xs text-abh-blue hover:underline" style={font}>
+                Forgot password?
+              </button>
+              <button type="button" onClick={() => { reset(); setMode('signup') }}
+                className="text-xs text-abh-blue hover:underline" style={font}>
+                Create account
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ---- Forgot password ---- */}
+        {mode === 'forgot' && (
+          <form onSubmit={handleForgot} className="space-y-4">
+            <h2 className="text-sm font-bold text-abh-navy" style={font}>Reset password</h2>
+            <p className="text-xs text-gray-500" style={font}>Enter your email and we will send a reset link.</p>
+            <div>
+              <label htmlFor="email-forgot" className="block text-sm font-medium text-abh-dktext mb-1" style={font}>Email</label>
+              <input id="email-forgot" type="email" autoComplete="email" required
+                value={email} onChange={e => setEmail(e.target.value)}
+                className={inputClass} style={font} placeholder="your@email.com" />
+            </div>
+
+            {error && <p className="text-sm text-abh-red bg-red-50 rounded-lg px-3 py-2" style={font}>{error}</p>}
+            {info  && <p className="text-sm text-abh-green bg-green-50 rounded-lg px-3 py-2" style={font}>{info}</p>}
+
+            <button type="submit" disabled={loading}
+              className="w-full bg-abh-navy text-white font-semibold rounded-lg py-3 text-sm hover:bg-opacity-90 disabled:opacity-50 transition-colors"
+              style={font}>
+              {loading ? 'Sending...' : 'Send reset link'}
+            </button>
+            <button type="button" onClick={() => { reset(); setMode('login') }}
+              className="w-full text-xs text-gray-500 hover:text-abh-navy pt-1" style={font}>
+              Back to sign in
+            </button>
+          </form>
+        )}
+
+        {/* ---- Create account ---- */}
+        {mode === 'signup' && (
+          <form onSubmit={handleSignup} className="space-y-4">
+            <h2 className="text-sm font-bold text-abh-navy" style={font}>Create account</h2>
+            <p className="text-xs text-gray-500" style={font}>Your manager will activate your access after sign-up.</p>
+            <div>
+              <label htmlFor="email-signup" className="block text-sm font-medium text-abh-dktext mb-1" style={font}>Email</label>
+              <input id="email-signup" type="email" autoComplete="email" required
+                value={email} onChange={e => setEmail(e.target.value)}
+                className={inputClass} style={font} placeholder="your@email.com" />
+            </div>
+            <div>
+              <label htmlFor="pw-signup" className="block text-sm font-medium text-abh-dktext mb-1" style={font}>Password</label>
+              <input id="pw-signup" type="password" autoComplete="new-password" required
+                value={password} onChange={e => setPassword(e.target.value)}
+                className={inputClass} style={font} placeholder="Min. 8 characters" />
+            </div>
+            <div>
+              <label htmlFor="pw-confirm" className="block text-sm font-medium text-abh-dktext mb-1" style={font}>Confirm password</label>
+              <input id="pw-confirm" type="password" autoComplete="new-password" required
+                value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                className={inputClass} style={font} />
+            </div>
+
+            {error && <p className="text-sm text-abh-red bg-red-50 rounded-lg px-3 py-2" style={font}>{error}</p>}
+            {info  && <p className="text-sm text-abh-green bg-green-50 rounded-lg px-3 py-2" style={font}>{info}</p>}
+
+            <button type="submit" disabled={loading}
+              className="w-full bg-abh-navy text-white font-semibold rounded-lg py-3 text-sm hover:bg-opacity-90 disabled:opacity-50 transition-colors"
+              style={font}>
+              {loading ? 'Creating...' : 'Create account'}
+            </button>
+            <button type="button" onClick={() => { reset(); setMode('login') }}
+              className="w-full text-xs text-gray-500 hover:text-abh-navy pt-1" style={font}>
+              Back to sign in
+            </button>
+          </form>
+        )}
+
+        <p className="text-center text-xs text-gray-400 mt-4" style={font}>
           Australian Beverage Holdings Pty Ltd — All rights reserved
         </p>
       </div>

@@ -16,7 +16,7 @@ import { TermsPage } from './components/terms/TermsPage'
 import { startSyncEngine } from './lib/sync'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { session, loading } = useAuth()
+  const { session, repUser, loading } = useAuth()
 
   if (loading) {
     return (
@@ -29,6 +29,24 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   }
 
   if (!session) return <Navigate to="/login" replace />
+
+  // Signed up but not yet added to rep_users by an admin
+  if (!repUser) {
+    return (
+      <div className="min-h-screen bg-abh-navy flex flex-col items-center justify-center px-6 text-center"
+           style={{ fontFamily: 'Arial, sans-serif' }}>
+        <p className="text-white font-bold text-base mb-2">Access pending</p>
+        <p className="text-blue-200 text-sm max-w-xs">
+          Your account has been created. A manager needs to activate your access before you can log in.
+          Contact your manager or email{' '}
+          <a href="mailto:enquiries@abhgroup.com.au" className="underline text-white">
+            enquiries@abhgroup.com.au
+          </a>
+        </p>
+      </div>
+    )
+  }
+
   return <>{children}</>
 }
 
