@@ -84,15 +84,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function fetchRepUser(userId: string) {
-    const { data, error } = await supabase
-      .from('rep_users')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle()
-    if (error) {
-      console.error('[auth] fetchRepUser error:', error.code, error.message)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 1000 * attempt))
+      const { data, error } = await (supabase as any)
+        .from('rep_users')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle()
+      if (error) {
+        console.error('[auth] fetchRepUser attempt', attempt + 1, 'error:', error.code, error.message)
+        localStorage.setItem('__shelf_repuser_error', JSON.stringify({ attempt, code: error.code, msg: error.message, userId }))
+        if (attempt < 2) continue
+      }
+      localStorage.setItem('__shelf_repuser_debug', JSON.stringify({ userId, data, errorCode: error?.code ?? null }))
+      setRepUser(data as RepUser | null)
+      setRepLoading(false)
+      return
     }
-    setRepUser(data as RepUser | null)
     setRepLoading(false)
   }
 

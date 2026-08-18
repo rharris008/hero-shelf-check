@@ -39,13 +39,23 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 
 function RequireAdmin({ children }: { children: React.ReactNode }) {
-  const { repUser, repLoading } = useAuth()
+  const { repUser, repLoading, session } = useAuth()
   if (repLoading) return null
   if (!repUser || repUser.role !== 'admin') {
+    const debug = (() => { try { return JSON.parse(localStorage.getItem('__shelf_repuser_debug') ?? 'null') } catch { return null } })()
     return (
       <div className="text-center py-16 px-6" style={{ fontFamily: 'Arial, sans-serif' }}>
         <p className="text-sm font-bold text-abh-navy mb-1">Admin access required</p>
-        <p className="text-xs text-gray-400">Contact your manager to request dashboard access.</p>
+        <p className="text-xs text-gray-400 mb-3">Contact your manager to request dashboard access.</p>
+        {session && (
+          <div className="text-left bg-gray-50 rounded-lg p-3 text-xs text-gray-500 font-mono break-all">
+            <p>auth uid: {session.user.id}</p>
+            <p>repUser: {repUser ? JSON.stringify(repUser) : 'null'}</p>
+            {debug && <p>last fetch uid: {debug.userId}</p>}
+            {debug && <p>fetch result: {debug.data ? 'row found' : 'null'}</p>}
+            {debug && debug.errorCode && <p>error: {debug.errorCode}</p>}
+          </div>
+        )}
       </div>
     )
   }
