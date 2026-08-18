@@ -38,9 +38,10 @@ export async function loadStoreCache(stores: Store[]) {
 export async function searchStores(query: string, retailer?: string): Promise<Store[]> {
   const q = query.toLowerCase().trim()
   if (!q) {
-    let collection = db.stores.where('is_active').equals(1 as unknown as boolean)
-    if (retailer) collection = db.stores.where('retailer').equals(retailer)
-    return collection.limit(50).toArray()
+    return db.stores
+      .filter(s => s.is_active === true && (!retailer || s.retailer === retailer))
+      .limit(50)
+      .toArray()
   }
 
   return db.stores
