@@ -1,292 +1,570 @@
 // ============================================================
-// AdminDashboard — prioritised action list (Red / Amber / Grey)
-// Red:   shelf = 0 and backroom = none_present  → lost sale
-// Amber: shelf = 0 and backroom = counted       → stock in backroom, push to shelf
-// Grey:  not visited in 7+ days                 → coverage gap
-// Data: store_availability_summary view (run database/002_view_backroom_rep.sql first)
+// OSA Dashboard — macro to micro drill-down
+// National → Retailer → State → City → Store → SKU
 // ============================================================
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
+import { getRegion } from '../../lib/regions'
 import type { StoreAvailabilitySummary, Retailer } from '../../types'
 
-const RETAILER_LABELS: Record<string, string> = {
+// ---- Types --------------------------------------------------
+
+type DrillLevel = 'national' | 'retailer' | 'state' | 'city' | 'store'
+
+interface DrillState {
+  level: DrillLevel
+  retailer: Retailer | null
+  state: string | null
+  city: string | null
+  storeId: string | null
+  storeName: string | null
+}
+
+interface OSAMetrics {
+  total: number
+  visited: number
+  inStock: number
+  oos: number
+  easyWin: number
+  lostSale: number
+  noData: number
+  osa: number          // % visited that have stock
+  coverage: number     // % of total that have been visited
+}
+
+// ---- Helpers ------------------------------------------------
+
+const RETAILER_LABEL: Record<string, string> = {
   woolworths: 'Woolworths',
   coles: 'Coles',
-  metcash: 'Metcash',
+  metcash: 'Metcash / IGA',
 }
 
-type Priority = 'red' | 'amber' | 'grey' | 'green'
+function computeMetrics(rows: StoreAvailabilitySummary[]): OSAMetrics {
+  const visited  = rows.filter(r => r.last_visit_date !== null)
+  const inStock  = visited.filter(r => (r.latest_shelf_units ?? 0) > 0)
+  const oos      = visited.filter(r => (r.latest_shelf_units ?? 0) === 0)
+  const easyWin  = oos.filter(r => r.latest_backroom_status === 'counted' || r.latest_backroom_status === 'not_checked')
+  const lostSale = oos.filter(r => r.latest_backroom_status === 'none_present')
+  const noData   = rows.filter(r => r.last_visit_date === null)
+  return {
+    total:    rows.length,
+    visited:  visited.length,
+    inStock:  inStock.length,
+    oos:      oos.length,
+    easyWin:  easyWin.length,
+    lostSale: lostSale.length,
+    noData:   noData.length,
+    osa:      visited.length > 0 ? Math.round(inStock.length / visited.length * 100) : 0,
+    coverage: rows.length > 0 ? Math.round(visited.length / rows.length * 100) : 0,
+  }
+}
 
-function getPriority(row: StoreAvailabilitySummary): Priority {
-  const shelf = row.latest_shelf_units
-  const backroom = row.latest_backroom_status
-  const days = row.days_since_visit ?? 999
+function uniqueStores(rows: StoreAvailabilitySummary[]): number {
+  return new Set(rows.map(r => r.store_id)).size
+}
 
-  // Never visited = grey (no data)
-  if (row.last_visit_date === null) return 'grey'
+function osaColor(pct: number): string {
+  if (pct >= 90) return '#27AE60'
+  if (pct >= 75) return '#E67E22'
+  return '#C0392B'
+}
 
-  // Zero shelf
-  if (shelf === 0) {
-    if (backroom === 'none_present') return 'red'   // lost sale — nothing anywhere
-    if (backroom === 'counted')      return 'amber'  // stock out back, push to shelf
-    if (backroom === 'not_checked')  return 'amber'  // unknown backroom, needs check
-    // backroom null = view not yet patched — treat zero shelf as amber
-    return 'amber'
+// ---- Sub-components -----------------------------------------
+
+function OSABar({ value, size = 'md' }: { value: number; size?: 'sm' | 'md' | 'lg' }) {
+  const h = size === 'lg' ? 'h-2.5' : size === 'md' ? 'h-2' : 'h-1.5'
+  const color = osaColor(value)
+  return (
+    <div className={`w-full bg-gray-200 rounded-full ${h} overflow-hidden`}>
+      <div
+        className={`${h} rounded-full transition-all`}
+        style={{ width: `${value}%`, backgroundColor: color }}
+      />
+    </div>
+  )
+}
+
+function MetricTile({ label, value, sub, color }: {
+  label: string; value: string | number; sub?: string; color?: string
+}) {
+  return (
+    <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+      <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">{label}</p>
+      <p className="text-xl font-bold" style={{ color: color ?? '#1B2A4A', fontFamily: 'Arial, sans-serif' }}>
+        {value}
+      </p>
+      {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  )
+}
+
+function Breadcrumb({ drill, onNav }: { drill: DrillState; onNav: (level: DrillLevel) => void }) {
+  const crumbs: Array<{ label: string; level: DrillLevel }> = [
+    { label: 'All Retailers', level: 'national' },
+  ]
+  if (drill.retailer) crumbs.push({ label: RETAILER_LABEL[drill.retailer] ?? drill.retailer, level: 'retailer' })
+  if (drill.state)    crumbs.push({ label: drill.state, level: 'state' })
+  if (drill.city)     crumbs.push({ label: drill.city, level: 'city' })
+  if (drill.storeName) crumbs.push({ label: drill.storeName, level: 'store' })
+
+  return (
+    <div className="flex items-center gap-1 flex-wrap text-xs" style={{ fontFamily: 'Arial, sans-serif' }}>
+      {crumbs.map((c, i) => (
+        <React.Fragment key={c.level}>
+          {i > 0 && <span className="text-gray-300">›</span>}
+          <button
+            onClick={() => onNav(c.level)}
+            className={i === crumbs.length - 1
+              ? 'font-bold text-abh-navy pointer-events-none'
+              : 'text-abh-blue hover:underline'}
+          >
+            {c.label}
+          </button>
+        </React.Fragment>
+      ))}
+    </div>
+  )
+}
+
+function SKUTable({ rows }: { rows: StoreAvailabilitySummary[] }) {
+  const skus = Array.from(new Set(rows.map(r => r.sku_name))).sort()
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="grid grid-cols-5 gap-0 px-3 py-2 bg-abh-navy text-white text-[10px] font-bold uppercase tracking-wide">
+        <div className="col-span-2">SKU</div>
+        <div className="text-center">OSA</div>
+        <div className="text-center">OOS</div>
+        <div className="text-center">Easy win</div>
+      </div>
+      {skus.map(sku => {
+        const skuRows = rows.filter(r => r.sku_name === sku)
+        const m = computeMetrics(skuRows)
+        return (
+          <div key={sku} className="grid grid-cols-5 gap-0 px-3 py-2 border-t border-gray-100 items-center">
+            <div className="col-span-2 text-xs font-medium text-abh-dktext truncate pr-2">{sku}</div>
+            <div className="text-center">
+              <span className="text-xs font-bold" style={{ color: osaColor(m.osa) }}>{m.osa}%</span>
+            </div>
+            <div className="text-center text-xs text-abh-red font-bold">{m.oos > 0 ? m.oos : '–'}</div>
+            <div className="text-center text-xs text-abh-amber font-bold">{m.easyWin > 0 ? m.easyWin : '–'}</div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function DrillRowFull({ label, sub, metrics, storeCount, onClick }: {
+  label: string
+  sub?: string
+  metrics: OSAMetrics
+  storeCount: number
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-left
+                 hover:border-abh-blue hover:shadow-md transition-all active:scale-[0.99]"
+    >
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-abh-navy truncate" style={{ fontFamily: 'Arial, sans-serif' }}>
+            {label}
+          </p>
+          {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="text-right">
+            <p className="text-lg font-bold" style={{ color: osaColor(metrics.osa), fontFamily: 'Arial, sans-serif' }}>
+              {metrics.osa}%
+            </p>
+            <p className="text-[9px] text-gray-400">OSA</p>
+          </div>
+          <span className="text-abh-blue text-sm">›</span>
+        </div>
+      </div>
+      <OSABar value={metrics.osa} />
+      <div className="flex gap-4 mt-2">
+        <span className="text-[10px] text-gray-500">{storeCount} {storeCount === 1 ? 'store' : 'stores'}</span>
+        <span className="text-[10px] text-gray-400">{metrics.coverage}% visited</span>
+        {metrics.lostSale > 0 && <span className="text-[10px] text-abh-red font-bold">⚠ {metrics.lostSale} lost sales</span>}
+        {metrics.easyWin > 0 && <span className="text-[10px] text-abh-amber font-bold">↑ {metrics.easyWin} easy wins</span>}
+      </div>
+    </button>
+  )
+}
+
+function StoreCard({ rows }: { rows: StoreAvailabilitySummary[] }) {
+  if (rows.length === 0) return null
+  const first = rows[0]
+  const m = computeMetrics(rows)
+
+  function backroomLabel(s: string | null): string {
+    if (s === 'counted')      return 'In backroom'
+    if (s === 'not_checked')  return 'Backroom not checked'
+    if (s === 'none_present') return 'No backroom stock'
+    return ''
   }
 
-  // Has stock but stale visit
-  if (days > 7) return 'grey'
+  return (
+    <div className="space-y-3">
+      {/* Store header */}
+      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <p className="text-base font-bold text-abh-navy" style={{ fontFamily: 'Arial, sans-serif' }}>
+              {first.store_name}
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {RETAILER_LABEL[first.retailer] ?? first.retailer}
+              {first.suburb ? ` · ${first.suburb}` : ''}
+              {first.state ? `, ${first.state}` : ''}
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {first.last_visit_date
+                ? `Last visit ${first.days_since_visit}d ago${first.last_rep_name ? ` · ${first.last_rep_name}` : ''}`
+                : 'Never visited'}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-2xl font-bold" style={{ color: osaColor(m.osa), fontFamily: 'Arial, sans-serif' }}>
+              {m.osa}%
+            </p>
+            <p className="text-[10px] text-gray-400">OSA</p>
+          </div>
+        </div>
+        <OSABar value={m.osa} size="lg" />
+      </div>
 
-  return 'green'
+      {/* SKU breakdown */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-4 py-2.5 bg-abh-navy">
+          <p className="text-xs font-bold text-white uppercase tracking-wide">SKU Detail</p>
+        </div>
+        {rows.map(row => {
+          const shelf = row.latest_shelf_units
+          const isOOS = shelf === 0
+          const hasData = row.last_visit_date !== null
+          const priority = !hasData ? 'no-data'
+            : isOOS && row.latest_backroom_status === 'none_present' ? 'red'
+            : isOOS ? 'amber'
+            : 'green'
+
+          const dotColor = priority === 'red' ? 'bg-abh-red'
+            : priority === 'amber' ? 'bg-abh-amber'
+            : priority === 'green' ? 'bg-abh-green'
+            : 'bg-gray-300'
+
+          return (
+            <div key={row.sku_id} className="px-4 py-3 border-t border-gray-100">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2 flex-1 min-w-0">
+                  <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${dotColor}`} />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-abh-dktext">{row.sku_name}</p>
+                    {hasData ? (
+                      <p className="text-[10px] text-gray-400 mt-0.5">{backroomLabel(row.latest_backroom_status)}</p>
+                    ) : (
+                      <p className="text-[10px] text-gray-400 mt-0.5">No visit data</p>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  {hasData ? (
+                    <>
+                      <p className={`text-sm font-bold ${isOOS ? 'text-abh-red' : 'text-abh-green'}`}>
+                        {shelf} on shelf
+                      </p>
+                      {row.avg_shelf_units_30d != null && (
+                        <p className="text-[10px] text-gray-400">{Math.round(row.avg_shelf_units_30d)} avg/30d</p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-xs text-gray-300">–</p>
+                  )}
+                </div>
+              </div>
+              {row.latest_photo_url && (
+                <div className="mt-2 ml-4">
+                  <img
+                    src={row.latest_photo_url}
+                    alt="shelf"
+                    className="h-24 w-32 object-cover rounded-lg border border-gray-200"
+                    loading="lazy"
+                  />
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
-function priorityOrder(p: Priority): number {
-  return { red: 0, amber: 1, grey: 2, green: 3 }[p]
-}
-
-const PRIORITY_CONFIG = {
-  red: {
-    label: 'Lost sale',
-    sub: 'Zero on shelf — no backroom stock',
-    dot: 'bg-abh-red',
-    border: 'border-abh-red',
-    badge: 'bg-abh-red text-white',
-  },
-  amber: {
-    label: 'Easy win',
-    sub: 'Zero on shelf — stock in backroom or unchecked',
-    dot: 'bg-abh-amber',
-    border: 'border-abh-amber',
-    badge: 'bg-abh-amber text-white',
-  },
-  grey: {
-    label: 'Coverage gap',
-    sub: 'Not visited in 7+ days',
-    dot: 'bg-gray-400',
-    border: 'border-gray-400',
-    badge: 'bg-gray-400 text-white',
-  },
-  green: {
-    label: 'OK',
-    sub: 'On shelf, visited recently',
-    dot: 'bg-abh-green',
-    border: 'border-abh-green',
-    badge: 'bg-abh-green text-white',
-  },
-}
+// ---- Main component -----------------------------------------
 
 export function AdminDashboard() {
-  const [data, setData] = useState<StoreAvailabilitySummary[]>([])
+  const [allRows, setAllRows] = useState<StoreAvailabilitySummary[]>([])
   const [loading, setLoading] = useState(true)
-  const [retailerFilter, setRetailerFilter] = useState<Retailer | 'all'>('all')
-  const [stateFilter, setStateFilter] = useState<string>('all')
-  const [skuFilter, setSkuFilter] = useState<string>('all')
-  const [showGreen, setShowGreen] = useState(false)
+  const [drill, setDrill] = useState<DrillState>({
+    level: 'national',
+    retailer: null,
+    state: null,
+    city: null,
+    storeId: null,
+    storeName: null,
+  })
 
   useEffect(() => {
     supabase
       .from('store_availability_summary')
       .select('*')
-      .limit(500)
-      .then(({ data: rows }) => {
-        setData((rows ?? []) as StoreAvailabilitySummary[])
+      .limit(2000)
+      .then(({ data }) => {
+        setAllRows((data ?? []) as StoreAvailabilitySummary[])
         setLoading(false)
       })
   }, [])
 
-  const states = ['all', ...Array.from(new Set(data.map(d => d.state).filter(Boolean))).sort()]
-  const retailers: Array<Retailer | 'all'> = ['all', 'woolworths', 'coles', 'metcash']
-  const skus = ['all', ...Array.from(new Set(data.map(d => d.sku_name).filter(Boolean))).sort()]
+  // Slice data to current drill context
+  const ctxRows = useMemo(() => {
+    let r = allRows
+    if (drill.retailer) r = r.filter(x => x.retailer === drill.retailer)
+    if (drill.state)    r = r.filter(x => x.state === drill.state)
+    if (drill.city)     r = r.filter(x => getRegion(x.postcode ?? '', x.state) === drill.city)
+    if (drill.storeId)  r = r.filter(x => x.store_id === drill.storeId)
+    return r
+  }, [allRows, drill])
 
-  const filtered = data.filter(d => {
-    if (retailerFilter !== 'all' && d.retailer !== retailerFilter) return false
-    if (stateFilter !== 'all' && d.state !== stateFilter) return false
-    if (skuFilter !== 'all' && d.sku_name !== skuFilter) return false
-    return true
-  })
+  const ctxMetrics = useMemo(() => computeMetrics(ctxRows), [ctxRows])
 
-  const withPriority = filtered
-    .map(d => ({ ...d, priority: getPriority(d) }))
-    .sort((a, b) => {
-      const po = priorityOrder(a.priority) - priorityOrder(b.priority)
-      if (po !== 0) return po
-      return a.store_name.localeCompare(b.store_name)
+  // Navigate breadcrumb
+  function navTo(level: DrillLevel) {
+    setDrill(d => ({
+      ...d,
+      level,
+      retailer: level === 'national' ? null : d.retailer,
+      state:    (level === 'national' || level === 'retailer') ? null : d.state,
+      city:     (level === 'national' || level === 'retailer' || level === 'state') ? null : d.city,
+      storeId:  level !== 'store' ? null : d.storeId,
+      storeName: level !== 'store' ? null : d.storeName,
+    }))
+  }
+
+  // Drill into a retailer
+  function drillRetailer(retailer: Retailer) {
+    setDrill({ level: 'retailer', retailer, state: null, city: null, storeId: null, storeName: null })
+  }
+
+  // Drill into a state
+  function drillState(state: string) {
+    setDrill(d => ({ ...d, level: 'state', state, city: null, storeId: null, storeName: null }))
+  }
+
+  // Drill into a city
+  function drillCity(city: string) {
+    setDrill(d => ({ ...d, level: 'city', city, storeId: null, storeName: null }))
+  }
+
+  // Drill into a store
+  function drillStore(storeId: string, storeName: string) {
+    setDrill(d => ({ ...d, level: 'store', storeId, storeName }))
+  }
+
+  // ---- Compute group-by lists ----
+
+  // Retailers (national level)
+  const retailers = useMemo(() => {
+    const keys = Array.from(new Set(allRows.map(r => r.retailer))).sort()
+    return keys.map(retailer => {
+      const rows = allRows.filter(r => r.retailer === retailer)
+      return { retailer, rows, metrics: computeMetrics(rows), storeCount: uniqueStores(rows) }
     })
+  }, [allRows])
 
-  const redRows   = withPriority.filter(r => r.priority === 'red')
-  const amberRows = withPriority.filter(r => r.priority === 'amber')
-  const greyRows  = withPriority.filter(r => r.priority === 'grey')
-  const greenRows = withPriority.filter(r => r.priority === 'green')
+  // States (retailer level)
+  const states = useMemo(() => {
+    if (!drill.retailer) return []
+    const keys = Array.from(new Set(ctxRows.map(r => r.state))).sort()
+    return keys.map(state => {
+      const rows = ctxRows.filter(r => r.state === state)
+      return { state, rows, metrics: computeMetrics(rows), storeCount: uniqueStores(rows) }
+    })
+  }, [ctxRows, drill.retailer])
 
-  const actionRows = showGreen
-    ? withPriority
-    : withPriority.filter(r => r.priority !== 'green')
+  // Cities (state level)
+  const cities = useMemo(() => {
+    if (!drill.state) return []
+    const keys = Array.from(new Set(ctxRows.map(r => getRegion(r.postcode ?? '', r.state)))).sort()
+    return keys.map(city => {
+      const rows = ctxRows.filter(r => getRegion(r.postcode ?? '', r.state) === city)
+      return { city, rows, metrics: computeMetrics(rows), storeCount: uniqueStores(rows) }
+    })
+  }, [ctxRows, drill.state])
 
-  function backroomLabel(status: string | null): string {
-    if (!status) return ''
-    if (status === 'counted')      return 'Stock in backroom'
-    if (status === 'none_present') return 'No backroom stock'
-    if (status === 'not_checked')  return 'Backroom not checked'
-    return status
+  // Stores (city level)
+  const stores = useMemo(() => {
+    if (!drill.city) return []
+    const storeIds = Array.from(new Set(ctxRows.map(r => r.store_id)))
+    return storeIds.map(storeId => {
+      const rows = ctxRows.filter(r => r.store_id === storeId)
+      const name = rows[0]?.store_name ?? storeId
+      return { storeId, name, rows, metrics: computeMetrics(rows) }
+    }).sort((a, b) => a.metrics.osa - b.metrics.osa) // worst OSA first
+  }, [ctxRows, drill.city])
+
+  // Store rows for store-level detail
+  const storeRows = useMemo(() => {
+    if (!drill.storeId) return []
+    return allRows.filter(r => r.store_id === drill.storeId)
+  }, [allRows, drill.storeId])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <p className="text-sm text-gray-400" style={{ fontFamily: 'Arial, sans-serif' }}>Loading…</p>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-4" style={{ fontFamily: 'Arial, sans-serif' }}>
-      <h1 className="font-bold text-abh-navy text-lg">Action list</h1>
+      {/* Breadcrumb */}
+      <Breadcrumb drill={drill} onNav={navTo} />
 
-      {/* KPI tiles */}
-      <div className="grid grid-cols-3 gap-2">
-        {/* Red */}
-        <div className="bg-white rounded-xl p-3 shadow-sm border-l-4 border-abh-red">
-          <p className="text-[10px] text-gray-500 leading-tight mb-1">Lost sales</p>
-          <p className="text-xl font-bold text-abh-red">{loading ? '...' : redRows.length}</p>
-          <p className="text-[10px] text-gray-400 leading-tight">zero shelf + no stock</p>
-        </div>
-        {/* Amber */}
-        <div className="bg-white rounded-xl p-3 shadow-sm border-l-4 border-abh-amber">
-          <p className="text-[10px] text-gray-500 leading-tight mb-1">Easy wins</p>
-          <p className="text-xl font-bold text-abh-amber">{loading ? '...' : amberRows.length}</p>
-          <p className="text-[10px] text-gray-400 leading-tight">stock in backroom</p>
-        </div>
-        {/* Grey */}
-        <div className="bg-white rounded-xl p-3 shadow-sm border-l-4 border-gray-400">
-          <p className="text-[10px] text-gray-500 leading-tight mb-1">Stale</p>
-          <p className="text-xl font-bold text-gray-500">{loading ? '...' : greyRows.length}</p>
-          <p className="text-[10px] text-gray-400 leading-tight">7+ days no visit</p>
-        </div>
-      </div>
+      {/* Headline metrics */}
+      {drill.level !== 'store' && (
+        <>
+          {/* OSA gauge */}
+          <div className="bg-abh-navy rounded-xl p-4 text-white shadow-sm">
+            <div className="flex items-end justify-between mb-2">
+              <div>
+                <p className="text-[11px] text-blue-200 uppercase tracking-wide mb-0.5">On Shelf Availability</p>
+                <p className="text-4xl font-bold" style={{ color: osaColor(ctxMetrics.osa) }}>
+                  {ctxMetrics.osa}%
+                </p>
+                <p className="text-[11px] text-blue-300 mt-0.5">
+                  {ctxMetrics.inStock} of {ctxMetrics.visited} visited store/SKU combinations in stock
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px] text-blue-200 uppercase tracking-wide mb-0.5">Coverage</p>
+                <p className="text-2xl font-bold text-white">{ctxMetrics.coverage}%</p>
+                <p className="text-[11px] text-blue-300 mt-0.5">{ctxMetrics.noData} never visited</p>
+              </div>
+            </div>
+            <OSABar value={ctxMetrics.osa} size="lg" />
+          </div>
 
-      {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
-        <select
-          value={retailerFilter}
-          onChange={e => setRetailerFilter(e.target.value as Retailer | 'all')}
-          className="border border-abh-mdgrey rounded-lg px-2 py-1.5 text-xs bg-white"
-        >
-          {retailers.map(r => (
-            <option key={r} value={r}>{r === 'all' ? 'All retailers' : RETAILER_LABELS[r]}</option>
-          ))}
-        </select>
+          {/* KPI tiles */}
+          <div className="grid grid-cols-3 gap-2">
+            <MetricTile
+              label="Lost sales"
+              value={ctxMetrics.lostSale}
+              sub="Zero shelf · no backroom"
+              color="#C0392B"
+            />
+            <MetricTile
+              label="Easy wins"
+              value={ctxMetrics.easyWin}
+              sub="Stock in backroom"
+              color="#E67E22"
+            />
+            <MetricTile
+              label="No coverage"
+              value={ctxMetrics.noData}
+              sub="Never visited"
+              color="#999999"
+            />
+          </div>
 
-        <select
-          value={stateFilter}
-          onChange={e => setStateFilter(e.target.value)}
-          className="border border-abh-mdgrey rounded-lg px-2 py-1.5 text-xs bg-white"
-        >
-          {states.map(s => (
-            <option key={s} value={s}>{s === 'all' ? 'All states' : s}</option>
-          ))}
-        </select>
-
-        <select
-          value={skuFilter}
-          onChange={e => setSkuFilter(e.target.value)}
-          className="border border-abh-mdgrey rounded-lg px-2 py-1.5 text-xs bg-white"
-        >
-          {skus.map(s => (
-            <option key={s} value={s}>{s === 'all' ? 'All SKUs' : s}</option>
-          ))}
-        </select>
-
-        <button
-          onClick={() => setShowGreen(g => !g)}
-          className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-            showGreen
-              ? 'bg-abh-green text-white border-abh-green'
-              : 'bg-white text-gray-500 border-abh-mdgrey'
-          }`}
-        >
-          {showGreen ? `Hide OK (${greenRows.length})` : `Show OK (${greenRows.length})`}
-        </button>
-      </div>
-
-      {/* Action list */}
-      {loading ? (
-        <p className="text-center text-sm text-gray-400 py-8">Loading...</p>
-      ) : actionRows.length === 0 ? (
-        <div className="bg-white rounded-xl p-8 text-center shadow-sm">
-          <p className="text-abh-green font-bold text-base mb-1">All clear</p>
-          <p className="text-xs text-gray-400">No action items match the selected filters.</p>
-        </div>
-      ) : (
-        <ul className="space-y-2">
-          {actionRows.map((row, i) => {
-            const cfg = PRIORITY_CONFIG[row.priority]
-            return (
-              <li
-                key={`${row.store_id}-${row.sku_id}-${i}`}
-                className={`bg-white rounded-xl p-3 shadow-sm border-l-4 ${cfg.border}`}
-              >
-                <div className="flex items-start gap-2">
-                  {/* Priority dot */}
-                  <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-abh-dktext truncate">
-                        {row.store_name}
-                      </p>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${cfg.badge}`}>
-                        {cfg.label}
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {row.sku_name}
-                      {row.retailer ? ` · ${RETAILER_LABELS[row.retailer] ?? row.retailer}` : ''}
-                      {row.state ? ` · ${row.state}` : ''}
-                    </p>
-
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
-                      {/* Shelf count */}
-                      <span className={`text-xs font-bold ${
-                        row.latest_shelf_units === 0 ? 'text-abh-red' : 'text-abh-green'
-                      }`}>
-                        {row.latest_shelf_units != null ? `${row.latest_shelf_units} on shelf` : 'No data'}
-                      </span>
-
-                      {/* Backroom */}
-                      {row.latest_backroom_status && (
-                        <span className="text-xs text-gray-500">
-                          {backroomLabel(row.latest_backroom_status)}
-                        </span>
-                      )}
-
-                      {/* Days + rep */}
-                      <span className="text-xs text-gray-400">
-                        {row.days_since_visit != null
-                          ? `${row.days_since_visit}d ago`
-                          : 'Never visited'}
-                        {row.last_rep_name ? ` · ${row.last_rep_name}` : ''}
-                      </span>
-                    </div>
-
-                    {/* Shelf photo thumbnail if available */}
-                    {row.latest_photo_url && (
-                      <div className="mt-2">
-                        <img
-                          src={row.latest_photo_url}
-                          alt={`${row.store_name} shelf`}
-                          className="h-20 w-28 object-cover rounded-lg border border-abh-mdgrey"
-                          loading="lazy"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+          {/* SKU breakdown — always visible */}
+          <SKUTable rows={ctxRows} />
+        </>
       )}
 
-      {/* Count footer */}
-      {!loading && actionRows.length > 0 && (
-        <p className="text-center text-xs text-gray-400 pb-2">
-          Showing {actionRows.length} of {filtered.length} store/SKU combinations
-        </p>
+      {/* ---- Level-specific drill lists ---- */}
+
+      {/* National: by retailer */}
+      {drill.level === 'national' && (
+        <div className="space-y-2">
+          <p className="text-[11px] text-gray-400 uppercase tracking-wide font-bold px-1">By Retailer</p>
+          {retailers.map(({ retailer, metrics, storeCount }) => (
+            <DrillRowFull
+              key={retailer}
+              label={RETAILER_LABEL[retailer] ?? retailer}
+              sub={`${storeCount} ${storeCount === 1 ? 'store' : 'stores'}`}
+              metrics={metrics}
+              storeCount={storeCount}
+              onClick={() => drillRetailer(retailer as Retailer)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Retailer: by state */}
+      {drill.level === 'retailer' && (
+        <div className="space-y-2">
+          <p className="text-[11px] text-gray-400 uppercase tracking-wide font-bold px-1">By State</p>
+          {states.map(({ state, metrics, storeCount }) => (
+            <DrillRowFull
+              key={state}
+              label={state}
+              sub={`${storeCount} ${storeCount === 1 ? 'store' : 'stores'}`}
+              metrics={metrics}
+              storeCount={storeCount}
+              onClick={() => drillState(state)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* State: by city/region */}
+      {drill.level === 'state' && (
+        <div className="space-y-2">
+          <p className="text-[11px] text-gray-400 uppercase tracking-wide font-bold px-1">By Region</p>
+          {cities.map(({ city, metrics, storeCount }) => (
+            <DrillRowFull
+              key={city}
+              label={city}
+              sub={`${storeCount} ${storeCount === 1 ? 'store' : 'stores'}`}
+              metrics={metrics}
+              storeCount={storeCount}
+              onClick={() => drillCity(city)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* City: by store — worst OSA first */}
+      {drill.level === 'city' && (
+        <div className="space-y-2">
+          <p className="text-[11px] text-gray-400 uppercase tracking-wide font-bold px-1">
+            By Store — worst OSA first
+          </p>
+          {stores.map(({ storeId, name, metrics, rows }) => {
+            const first = rows[0]
+            return (
+              <DrillRowFull
+                key={storeId}
+                label={name}
+                sub={first?.suburb ? `${first.suburb} · Last visited ${first.days_since_visit ?? '?'}d ago` : undefined}
+                metrics={metrics}
+                storeCount={1}
+                onClick={() => drillStore(storeId, name)}
+              />
+            )
+          })}
+        </div>
+      )}
+
+      {/* Store: SKU detail */}
+      {drill.level === 'store' && storeRows.length > 0 && (
+        <StoreCard rows={storeRows} />
       )}
     </div>
   )

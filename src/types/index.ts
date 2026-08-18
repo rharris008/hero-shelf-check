@@ -93,7 +93,9 @@ export interface StoreAvailabilitySummary {
   store_id: string
   store_name: string
   retailer: Retailer
+  suburb: string | null
   state: string
+  postcode: string | null
   last_visit_date: string | null
   days_since_visit: number | null
   last_rep_name: string | null
