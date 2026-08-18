@@ -233,35 +233,77 @@ export function VisitForm() {
       {/* Step 2: SKU observations — only show when store is selected */}
       {store && (
         <section className="space-y-3">
-          <h2 className="font-bold text-abh-navy text-sm uppercase tracking-wide px-1" style={{ fontFamily: 'Arial, sans-serif' }}>
-            2. Shelf availability
-          </h2>
+          <div className="flex items-center justify-between px-1">
+            <h2 className="font-bold text-abh-navy text-sm uppercase tracking-wide" style={{ fontFamily: 'Arial, sans-serif' }}>
+              2. Shelf availability
+            </h2>
+            <span className="text-xs text-gray-400" style={{ fontFamily: 'Arial, sans-serif' }}>
+              {Array.from(observations.values()).filter(o => o.backroom_status != null).length}/{visibleSkus.length} done
+            </span>
+          </div>
 
           {visibleSkus.map(sku => {
             const obs = observations.get(sku.id)
-            return (
-              <div key={sku.id} className="bg-white rounded-xl p-4 shadow-sm">
-                <p className="font-semibold text-abh-dktext mb-3" style={{ fontFamily: 'Arial, sans-serif' }}>
-                  {sku.name}
-                </p>
+            const isDone = obs != null && obs.backroom_status != null
+            const isOOS = (obs?.shelf_units ?? -1) === 0
 
-                {/* Shelf units — mandatory */}
+            return (
+              <div key={sku.id}
+                   className={`bg-white rounded-xl p-4 shadow-sm border-2 transition-colors ${
+                     isDone ? 'border-abh-green' : 'border-transparent'
+                   }`}>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="font-semibold text-abh-dktext text-sm" style={{ fontFamily: 'Arial, sans-serif' }}>
+                    {sku.name}
+                  </p>
+                  {isDone && (
+                    <div className="w-6 h-6 bg-abh-green rounded-full flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+
+                {/* Shelf units — +/- stepper */}
                 <div className="mb-4">
-                  <label className="block text-xs font-medium text-gray-500 mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
-                    Shelf units (mandatory)
+                  <label className="block text-xs font-medium text-gray-500 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
+                    Shelf units <span className="text-abh-red">*</span>
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    required
-                    value={obs?.shelf_units ?? ''}
-                    onChange={e => updateObs(sku.id, { shelf_units: parseInt(e.target.value, 10) || 0 })}
-                    className="w-full border border-abh-mdgrey rounded-lg px-3 py-2.5 text-sm
-                               focus:outline-none focus:ring-2 focus:ring-abh-blue"
-                    style={{ fontFamily: 'Arial, sans-serif' }}
-                    placeholder="0"
-                  />
+                  <div className="flex items-center gap-3">
+                    <button type="button"
+                      onClick={() => updateObs(sku.id, { shelf_units: Math.max(0, (obs?.shelf_units ?? 0) - 1) })}
+                      className="w-10 h-10 rounded-xl bg-abh-ltgrey text-abh-navy font-bold text-xl
+                                 flex items-center justify-center active:bg-gray-300 flex-shrink-0">
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      step="1"
+                      required
+                      value={obs?.shelf_units ?? ''}
+                      onChange={e => updateObs(sku.id, { shelf_units: parseInt(e.target.value, 10) || 0 })}
+                      className={`flex-1 border rounded-xl px-3 py-2.5 text-lg font-bold text-center
+                                 focus:outline-none focus:ring-2 focus:ring-abh-blue min-w-0 ${
+                                   isOOS && isDone ? 'border-abh-red text-abh-red bg-red-50' : 'border-abh-mdgrey'
+                                 }`}
+                      style={{ fontFamily: 'Arial, sans-serif' }}
+                      placeholder="–"
+                    />
+                    <button type="button"
+                      onClick={() => updateObs(sku.id, { shelf_units: (obs?.shelf_units ?? 0) + 1 })}
+                      className="w-10 h-10 rounded-xl bg-abh-blue text-white font-bold text-xl
+                                 flex items-center justify-center active:bg-blue-700 flex-shrink-0">
+                      +
+                    </button>
+                  </div>
+                  {isOOS && isDone && (
+                    <p className="text-xs text-abh-red font-medium mt-1 text-center" style={{ fontFamily: 'Arial, sans-serif' }}>
+                      Out of stock — check backroom below
+                    </p>
+                  )}
                 </div>
 
                 {/* Backroom status — 3-state */}
