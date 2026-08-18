@@ -12,8 +12,10 @@
 alter table public.observations
   add column if not exists photo_url text default null;
 
--- Step 2: replace the analytics view
-create or replace view store_availability_summary as
+-- Step 2: drop old view, recreate with new columns
+drop view if exists store_availability_summary;
+
+create view store_availability_summary as
 with latest_obs as (
   select distinct on (v.store_id, o.sku_id)
     v.store_id,
