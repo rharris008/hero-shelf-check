@@ -34,21 +34,34 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   // Session exists but no rep_users record — signed up, awaiting admin activation
   if (!repUser) {
     return (
-      <div className="min-h-screen bg-abh-navy flex flex-col items-center justify-center px-6 text-center"
-           style={{ fontFamily: 'Arial, sans-serif' }}>
-        <p className="text-white font-bold text-base mb-2">Access pending</p>
-        <p className="text-blue-200 text-sm max-w-xs">
-          Your account has been created. A manager needs to activate your access before you can use the app.
-          Contact your manager or email{' '}
-          <a href="mailto:enquiries@abhgroup.com.au" className="underline text-white">
-            enquiries@abhgroup.com.au
-          </a>
-        </p>
-      </div>
+      <AccessPendingScreen />
     )
   }
 
   return <>{children}</>
+}
+
+function AccessPendingScreen() {
+  const { signOut } = useAuth()
+  return (
+    <div className="min-h-screen bg-abh-navy flex flex-col items-center justify-center px-6 text-center"
+         style={{ fontFamily: 'Arial, sans-serif' }}>
+      <p className="text-white font-bold text-base mb-2">Access pending</p>
+      <p className="text-blue-200 text-sm max-w-xs mb-6">
+        Your account has been created. A manager needs to activate your access before you can use the app.
+        Contact your manager or email{' '}
+        <a href="mailto:enquiries@abhgroup.com.au" className="underline text-white">
+          enquiries@abhgroup.com.au
+        </a>
+      </p>
+      <button
+        onClick={() => signOut()}
+        className="text-xs text-blue-300 underline hover:text-white"
+      >
+        Sign out
+      </button>
+    </div>
+  )
 }
 
 function RequireAdmin({ children }: { children: React.ReactNode }) {
