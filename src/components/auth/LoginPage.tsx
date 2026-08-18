@@ -7,7 +7,7 @@ import React, { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 
-type Mode = 'login' | 'forgot' | 'signup'
+type Mode = 'login' | 'forgot' | 'signup' | 'check-email'
 
 export function LoginPage() {
   const { signIn } = useAuth()
@@ -76,8 +76,8 @@ export function LoginPage() {
     if (error) {
       setError(error.message)
     } else {
-      setInfo('Account created. Check your email — click the link to confirm and activate your access.')
-      setMode('login')
+      setInfo(email.trim())
+      setMode('check-email')
       setPassword('')
       setConfirmPassword('')
       setFullName('')
@@ -229,8 +229,44 @@ export function LoginPage() {
           </form>
         )}
 
+        {mode === 'check-email' && (
+          <div className="text-center px-2 py-4 space-y-4">
+            <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+              <svg className="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-bold text-abh-navy text-base mb-1" style={font}>Check your inbox</p>
+              <p className="text-sm text-gray-600" style={font}>
+                We sent a confirmation link to
+              </p>
+              <p className="text-sm font-semibold text-abh-navy mt-0.5" style={font}>{info}</p>
+            </div>
+            <div className="bg-blue-50 rounded-xl px-4 py-3 text-left space-y-2">
+              <p className="text-xs font-bold text-abh-navy" style={font}>What happens next</p>
+              {['Click the link in the email to confirm your account', 'Sign in below', 'Accept the Terms of Use', 'You\'re in'].map((step, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span className="w-4 h-4 rounded-full bg-abh-blue text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5" style={font}>{i + 1}</span>
+                  <p className="text-xs text-gray-600" style={font}>{step}</p>
+                </div>
+              ))}
+            </div>
+            <button type="button" onClick={() => { reset(); setMode('login') }}
+              className="w-full bg-abh-navy text-white font-semibold rounded-lg py-3 text-sm"
+              style={font}>
+              Back to sign in
+            </button>
+          </div>
+        )}
+
         <p className="text-center text-xs text-gray-400 mt-4" style={font}>
           Australian Beverage Holdings Pty Ltd — All rights reserved
+        </p>
+        <p className="text-center text-xs text-gray-400 mt-2" style={font}>
+          Spotted a gap on shelf?{' '}
+          <a href="#/report" className="text-abh-blue underline">Report as guest</a>
         </p>
       </div>
     </div>

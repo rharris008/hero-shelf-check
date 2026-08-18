@@ -3,7 +3,7 @@
 // Shown once per device. Stored in localStorage.
 // ============================================================
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 
 const STORAGE_KEY = 'hero_shelf_check_onboarded'
 
@@ -17,45 +17,41 @@ function markOnboardingComplete() {
 
 const SLIDES = [
   {
+    emoji: '👋',
+    title: 'Welcome to Stock Shelf Checker',
+    body: 'Four quick things and you\'re ready to go.',
+    accent: '#1B2A4A',
+  },
+  {
     icon: (
-      <svg className="w-14 h-14 text-abh-blue mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-12 h-12 text-abh-blue mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
           d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
     ),
-    title: 'Find your store',
-    body: 'Search by store name, suburb, or postcode. Select your store before starting the check — you cannot free-type a store name.',
+    title: 'Pick your store',
+    body: 'Your nearest stores appear automatically. Search by name, suburb, or postcode to find any store in the network.',
   },
   {
     icon: (
-      <svg className="w-14 h-14 text-abh-blue mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-12 h-12 text-abh-blue mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
           d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
       </svg>
     ),
-    title: 'Count shelf units',
-    body: 'Enter the number of Pureau units you can see on the shelf for each product. Zero is a valid count — always record what you see.',
+    title: 'Count every Pureau SKU',
+    body: 'Enter the units you see on shelf. Always count — zero counts. Also tap what\'s in the backroom so we know if it\'s a ranging or replenishment issue.',
   },
   {
     icon: (
-      <svg className="w-14 h-14 text-abh-blue mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-12 h-12 text-abh-blue mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-          d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+          d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
       </svg>
     ),
-    title: 'Check the backroom',
-    body: 'For each product, tap Counted (and enter units), None present, or Could not check. This tells us if a store is low on shelf but has stock waiting.',
-  },
-  {
-    icon: (
-      <svg className="w-14 h-14 text-abh-blue mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-      </svg>
-    ),
-    title: 'Save — works offline',
-    body: 'Tap Save visit. Your check is saved to your device immediately. It syncs to the server automatically within 60 seconds when you have a connection.',
+    title: 'Works offline',
+    body: 'No signal? No problem. Save your visit — it stores on your device and syncs automatically the moment you get connectivity.',
   },
 ]
 
@@ -96,7 +92,12 @@ export function OnboardingModal({ onDone }: OnboardingModalProps) {
 
         {/* Content */}
         <div className="px-6 py-6 text-center min-h-[220px] flex flex-col items-center justify-center">
-          <div className="mb-4">{s.icon}</div>
+          <div className="mb-4">
+            {'emoji' in s
+              ? <span className="text-5xl">{(s as { emoji: string }).emoji}</span>
+              : (s as { icon: React.ReactNode }).icon
+            }
+          </div>
           <h2 className="font-bold text-abh-navy text-lg mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
             {s.title}
           </h2>

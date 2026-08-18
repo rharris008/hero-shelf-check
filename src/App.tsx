@@ -19,9 +19,8 @@ import { RoutePlanner } from './components/route/RoutePlanner'
 import { startSyncEngine } from './lib/sync'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { session, loading, repLoading } = useAuth()
+  const { session, loading, repLoading, repUser } = useAuth()
 
-  // Waiting for Supabase auth session
   if (loading || repLoading) {
     return (
       <div className="min-h-screen bg-abh-navy flex items-center justify-center">
@@ -33,6 +32,32 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   }
 
   if (!session) return <Navigate to="/login" replace />
+
+  // Authenticated but no rep_users profile yet — pending admin activation
+  if (!repUser) {
+    return (
+      <div className="min-h-screen bg-abh-navy flex flex-col items-center justify-center px-6 text-center"
+           style={{ fontFamily: 'Arial, sans-serif' }}>
+        <div className="w-16 h-16 rounded-full bg-abh-blue/20 border-2 border-abh-blue flex items-center justify-center mb-6">
+          <svg className="w-8 h-8 text-abh-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <p className="text-white font-bold text-lg mb-2">Access pending</p>
+        <p className="text-blue-200 text-sm max-w-xs mb-6">
+          Your account is awaiting activation. Your manager will grant access shortly.
+        </p>
+        <p className="text-blue-300 text-xs mb-8">Signed in as {session.user.email}</p>
+        <button
+          onClick={() => { window.location.reload() }}
+          className="text-abh-blue text-sm underline"
+        >
+          Refresh
+        </button>
+      </div>
+    )
+  }
 
   return <>{children}</>
 }

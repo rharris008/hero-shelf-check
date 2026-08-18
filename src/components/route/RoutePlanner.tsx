@@ -138,6 +138,19 @@ export function RoutePlanner() {
       })
   }, [annotated, retailerFilter, priorityFilter])
 
+  // OOS SKU names for a given store (from all summaries)
+  const oosByStore = useMemo(() => {
+    const m = new Map<string, string[]>()
+    for (const s of summaries) {
+      if ((s.latest_shelf_units ?? -1) === 0 && s.last_visit_date !== null) {
+        const arr = m.get(s.store_id) ?? []
+        arr.push(s.sku_name ?? s.sku_id)
+        m.set(s.store_id, arr)
+      }
+    }
+    return m
+  }, [summaries])
+
   function checkIn(store: Store) {
     navigate('/check', { state: { preselectedStore: store } })
   }
@@ -214,6 +227,7 @@ export function RoutePlanner() {
         <div className="space-y-2">
           {sorted.map(({ store, priority, days, km }) => {
             const p = PRIORITY_LABEL[priority]
+            const oosSKUs = oosByStore.get(store.id) ?? []
             return (
               <div
                 key={store.id}
@@ -245,6 +259,11 @@ export function RoutePlanner() {
                           ? 'Visited today'
                           : `Last visit ${days}d ago`}
                     </p>
+                    {oosSKUs.length > 0 && (
+                      <p className="text-[11px] text-abh-red font-medium mt-1">
+                        OOS: {oosSKUs.join(', ')}
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={() => checkIn(store)}

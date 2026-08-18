@@ -12,7 +12,7 @@ export function TermsPage() {
       <div className="bg-abh-navy text-white px-4 py-4 flex items-center justify-between">
         <div>
           <h1 className="font-bold text-sm">Terms of Use</h1>
-          <p className="text-blue-200 text-xs">Hero Shelf Check — Australian Beverage Holdings Pty Ltd</p>
+          <p className="text-blue-200 text-xs">Stock Shelf Checker — Australian Beverage Holdings Pty Ltd</p>
         </div>
         <Link to="/login" className="text-blue-200 text-xs hover:text-white">
           Sign in
@@ -26,7 +26,7 @@ export function TermsPage() {
 
         <section>
           <h2 className="font-bold text-abh-navy mb-2">1. Authorised Use Only</h2>
-          <p>This application (Hero Shelf Check) is provided exclusively for authorised field representatives of Australian Beverage Holdings Pty Ltd (ABH). Access is granted on a personal, non-transferable basis. You must not share your login credentials with any other person. Unauthorised use or access by a third party must be reported to ABH immediately.</p>
+          <p>This application (Stock Shelf Checker) is provided exclusively for authorised field representatives of Australian Beverage Holdings Pty Ltd (ABH). Access is granted on a personal, non-transferable basis. You must not share your login credentials with any other person. Unauthorised use or access by a third party must be reported to ABH immediately.</p>
         </section>
 
         <section>
@@ -67,7 +67,7 @@ export function TermsPage() {
 
         <section>
           <h2 className="font-bold text-abh-navy mb-2">7. Intellectual Property</h2>
-          <p>The Hero Shelf Check application, including all code, design, data structures, and content, is the intellectual property of Australian Beverage Holdings Pty Ltd. You have no right to copy, reverse engineer, modify, or redistribute any part of this application.</p>
+          <p>The Stock Shelf Checker application, including all code, design, data structures, and content, is the intellectual property of Australian Beverage Holdings Pty Ltd. You have no right to copy, reverse engineer, modify, or redistribute any part of this application.</p>
         </section>
 
         <section>
@@ -91,7 +91,7 @@ export function TermsPage() {
         </section>
 
         <p className="text-xs text-gray-400 pt-4 border-t border-gray-200">
-          Australian Beverage Holdings Pty Ltd — ABH Pureau Hero Shelf Check — All rights reserved
+          Australian Beverage Holdings Pty Ltd — ABH Pureau Stock Shelf Checker — All rights reserved
         </p>
       </div>
     </div>

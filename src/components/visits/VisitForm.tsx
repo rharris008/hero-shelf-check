@@ -137,26 +137,64 @@ export function VisitForm() {
   }
 
   if (submitted) {
+    const obsArray = Array.from(observations.values())
+    const oosCount = obsArray.filter(o => o.shelf_units === 0).length
+    const totalChecked = obsArray.length
+    const RETAILER_LABELS: Record<string, string> = {
+      woolworths: 'Woolworths', coles: 'Coles', metcash: 'Metcash / IGA',
+    }
+    const RETAILER_COLOURS: Record<string, string> = {
+      woolworths: 'bg-green-100 text-green-800',
+      coles: 'bg-red-100 text-red-800',
+      metcash: 'bg-blue-100 text-blue-800',
+    }
     return (
-      <div className="text-center py-16">
+      <div className="px-4 py-8 max-w-sm mx-auto text-center" style={{ fontFamily: 'Arial, sans-serif' }}>
         <div className="w-16 h-16 bg-abh-green rounded-full flex items-center justify-center mx-auto mb-4">
           <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h2 className="text-xl font-bold text-abh-dktext mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
-          Visit recorded
-        </h2>
-        <p className="text-gray-500 text-sm mb-6" style={{ fontFamily: 'Arial, sans-serif' }}>
-          Queued for sync. Will upload within 60 seconds when connected.
-        </p>
-        <button
-          onClick={reset}
-          className="bg-abh-navy text-white font-semibold rounded-xl px-6 py-3 text-sm"
-          style={{ fontFamily: 'Arial, sans-serif' }}
-        >
-          New visit
-        </button>
+        <h2 className="text-lg font-bold text-abh-dktext mb-1">Visit recorded</h2>
+        <p className="text-gray-400 text-xs mb-5">Queued for sync — will upload when connected.</p>
+
+        {/* Visit summary card */}
+        {store && (
+          <div className="bg-white rounded-xl border border-abh-mdgrey p-4 text-left mb-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${RETAILER_COLOURS[store.retailer]}`}>
+                {RETAILER_LABELS[store.retailer]}
+              </span>
+            </div>
+            <p className="font-semibold text-abh-dktext text-sm">{store.name}</p>
+            <p className="text-xs text-gray-500 mb-3">{store.suburb}, {store.state}</p>
+            <div className="flex gap-3">
+              <div className="flex-1 bg-abh-ltgrey rounded-lg px-3 py-2 text-center">
+                <p className="text-lg font-bold text-abh-navy">{totalChecked}</p>
+                <p className="text-xs text-gray-500">SKUs checked</p>
+              </div>
+              <div className={`flex-1 rounded-lg px-3 py-2 text-center ${oosCount > 0 ? 'bg-red-50' : 'bg-green-50'}`}>
+                <p className={`text-lg font-bold ${oosCount > 0 ? 'text-abh-red' : 'text-abh-green'}`}>{oosCount}</p>
+                <p className="text-xs text-gray-500">Out of stock</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            onClick={reset}
+            className="flex-1 bg-abh-navy text-white font-semibold rounded-xl py-3 text-sm"
+          >
+            New visit
+          </button>
+          <a
+            href="#/route"
+            className="flex-1 border border-abh-navy text-abh-navy font-semibold rounded-xl py-3 text-sm flex items-center justify-center"
+          >
+            Back to route
+          </a>
+        </div>
       </div>
     )
   }

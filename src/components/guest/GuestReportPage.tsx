@@ -51,7 +51,6 @@ export function GuestReportPage() {
   const [shelfUnits, setShelfUnits] = useState('')
   const [isOos, setIsOos] = useState(false)
   const [comment, setComment] = useState('')
-  const [email, setEmail] = useState('')
   const [storeSearch, setStoreSearch] = useState('')
 
   const [submitting, setSubmitting] = useState(false)
@@ -117,7 +116,6 @@ export function GuestReportPage() {
       shelf_units:        isOos ? 0 : (shelfUnits === '' ? null : parseInt(shelfUnits, 10)),
       is_oos:             isOos,
       comment:            comment.trim() || null,
-      reporter_email:     email.trim() || null,
       reporter_lat:       position?.latitude ?? null,
       reporter_lng:       position?.longitude ?? null,
       distance_to_store_m: (position && (selectedStore as StoreWithDist).distanceKm != null)
@@ -156,7 +154,6 @@ export function GuestReportPage() {
             setShelfUnits('')
             setIsOos(false)
             setComment('')
-            setEmail('')
           }}
           className="text-sm text-abh-blue underline"
         >
@@ -169,14 +166,9 @@ export function GuestReportPage() {
   return (
     <div className="min-h-screen bg-gray-50" style={{ fontFamily: 'Arial, sans-serif' }}>
       {/* Header */}
-      <div className="bg-abh-navy px-5 py-4 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-abh-blue flex items-center justify-center flex-shrink-0">
-          <span className="text-white text-xs font-bold">P</span>
-        </div>
-        <div>
-          <p className="text-white font-bold text-sm leading-none">Pureau Shelf Report</p>
-          <p className="text-blue-300 text-xs mt-0.5">Help us keep shelves stocked</p>
-        </div>
+      <div className="bg-abh-navy px-5 py-4">
+        <p className="text-white font-bold text-sm leading-none">Pureau Shelf Report</p>
+        <p className="text-blue-300 text-xs mt-0.5">Spotted a gap? Takes 30 seconds.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="px-4 py-5 space-y-6 max-w-lg mx-auto pb-16">
@@ -373,30 +365,20 @@ export function GuestReportPage() {
           </section>
         )}
 
-        {/* ── STEP 4: Comment + Email ── */}
+        {/* ── STEP 4: Comment (optional) ── */}
         {selectedStore && selectedSkuId && (
           <section>
             <h2 className="text-xs font-bold text-abh-navy uppercase tracking-wide mb-3">
               4. Notes <span className="text-gray-400 normal-case font-normal">(optional)</span>
             </h2>
-            <div className="space-y-3">
-              <textarea
-                value={comment}
-                onChange={e => setComment(e.target.value)}
-                placeholder="Anything else we should know? (e.g. product facing issues, incorrect price label, empty bay)"
-                rows={3}
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white
-                           focus:outline-none focus:ring-2 focus:ring-abh-blue shadow-sm resize-none"
-              />
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="Your email (optional — for follow-up)"
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white
-                           focus:outline-none focus:ring-2 focus:ring-abh-blue shadow-sm"
-              />
-            </div>
+            <textarea
+              value={comment}
+              onChange={e => setComment(e.target.value)}
+              placeholder="Anything else to note — empty bay, incorrect label, facing issue?"
+              rows={2}
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white
+                         focus:outline-none focus:ring-2 focus:ring-abh-blue shadow-sm resize-none"
+            />
           </section>
         )}
 
@@ -418,8 +400,7 @@ export function GuestReportPage() {
               {submitting ? 'Submitting...' : 'Submit Report'}
             </button>
             <p className="text-xs text-gray-400 text-center mt-3">
-              Reports are anonymous unless you provide your email.
-              Data is used by Pureau to improve shelf availability.
+              Reports are anonymous. Data is used by Pureau to improve shelf availability.
             </p>
           </div>
         )}
