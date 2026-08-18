@@ -13,6 +13,7 @@ import { AdminDashboard } from './components/admin/AdminDashboard'
 import { OnboardingModal, hasCompletedOnboarding } from './components/onboarding/OnboardingModal'
 import { TermsModal } from './components/terms/TermsModal'
 import { TermsPage } from './components/terms/TermsPage'
+import { GuestReportPage } from './components/guest/GuestReportPage'
 import { startSyncEngine } from './lib/sync'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -102,6 +103,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={session ? <Navigate to="/check" replace /> : <LoginPage />} />
       <Route path="/terms" element={<TermsPage />} />
+      <Route path="/report" element={<GuestReportPage />} />
 
       <Route element={<RequireAuth><Layout /></RequireAuth>}>
         <Route index element={<Navigate to="/check" replace />} />

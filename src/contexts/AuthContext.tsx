@@ -59,11 +59,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   async function syncReferenceData() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('stores')
       .select('id, retailer, store_number, name, address_line1, suburb, state, postcode, latitude, longitude, is_active')
       .eq('is_active', true)
       .order('name')
+    console.log('[sync] stores fetched:', data?.length, '| error:', error?.message ?? 'none',
+      '| retailers:', (data as Array<{ retailer: string }> | null)?.map(s => s.retailer).join(','))
     if (data && data.length > 0) {
       await loadStoreCache(data as Store[])
       setStoreVersion(v => v + 1)
@@ -99,7 +101,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function acceptTerms() {
     if (!session?.user) return
     const now = new Date().toISOString()
-    const { data } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase as any)
       .from('rep_users')
       .update({ terms_accepted_at: now })
       .eq('id', session.user.id)
