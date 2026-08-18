@@ -3,7 +3,7 @@
 // Falls back to queued (unsynced) items if offline.
 // ============================================================
 
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { getQueue } from '../../lib/db'

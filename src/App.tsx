@@ -14,10 +14,11 @@ import { OnboardingModal, hasCompletedOnboarding } from './components/onboarding
 import { TermsModal } from './components/terms/TermsModal'
 import { TermsPage } from './components/terms/TermsPage'
 import { GuestReportPage } from './components/guest/GuestReportPage'
+import { RoutePlanner } from './components/route/RoutePlanner'
 import { startSyncEngine } from './lib/sync'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { session, repUser, loading, repLoading } = useAuth()
+  const { session, loading, repLoading } = useAuth()
 
   // Waiting for Supabase auth session
   if (loading || repLoading) {
@@ -35,28 +36,6 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-function AccessPendingScreen() {
-  const { signOut } = useAuth()
-  return (
-    <div className="min-h-screen bg-abh-navy flex flex-col items-center justify-center px-6 text-center"
-         style={{ fontFamily: 'Arial, sans-serif' }}>
-      <p className="text-white font-bold text-base mb-2">Access pending</p>
-      <p className="text-blue-200 text-sm max-w-xs mb-6">
-        Your account has been created. A manager needs to activate your access before you can use the app.
-        Contact your manager or email{' '}
-        <a href="mailto:enquiries@abhgroup.com.au" className="underline text-white">
-          enquiries@abhgroup.com.au
-        </a>
-      </p>
-      <button
-        onClick={() => signOut()}
-        className="text-xs text-blue-300 underline hover:text-white"
-      >
-        Sign out
-      </button>
-    </div>
-  )
-}
 
 function RequireAdmin({ children }: { children: React.ReactNode }) {
   const { repUser, repLoading } = useAuth()
@@ -112,6 +91,7 @@ function AppRoutes() {
       <Route element={<RequireAuth><Layout /></RequireAuth>}>
         <Route index element={<Navigate to="/check" replace />} />
         <Route path="/check" element={<VisitForm />} />
+        <Route path="/route" element={<RoutePlanner />} />
         <Route path="/history" element={<VisitHistory />} />
         <Route
           path="/admin"

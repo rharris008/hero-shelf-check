@@ -3,7 +3,7 @@
 // Shown once per device. Stored in localStorage.
 // ============================================================
 
-import React, { useState } from 'react'
+import { useState } from 'react'
 
 const STORAGE_KEY = 'hero_shelf_check_onboarded'
 

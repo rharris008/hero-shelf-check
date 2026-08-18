@@ -5,6 +5,7 @@
 // ============================================================
 
 import React, { useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { StorePicker } from '../stores/StorePicker'
 import { useAuth } from '../../contexts/AuthContext'
 import { enqueue } from '../../lib/db'
@@ -57,7 +58,9 @@ function uuid(): string {
 
 export function VisitForm() {
   const { repUser, liveSKUs } = useAuth()
-  const [store, setStore] = useState<Store | null>(null)
+  const location = useLocation()
+  const preselected = (location.state as { preselectedStore?: Store } | null)?.preselectedStore ?? null
+  const [store, setStore] = useState<Store | null>(preselected)
   const [observations, setObservations] = useState<Map<string, SkuObservation>>(new Map())
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)

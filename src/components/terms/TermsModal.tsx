@@ -4,7 +4,7 @@
 // in Supabase rep_users.terms_accepted_at.
 // ============================================================
 
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 
 interface TermsModalProps {

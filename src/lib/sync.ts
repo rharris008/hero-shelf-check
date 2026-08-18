@@ -37,10 +37,13 @@ function notify(pending: number) {
 
 async function uploadVisit(item: OfflineQueueItem): Promise<boolean> {
   const { visit, localId } = item
+  // sb cast bypasses Supabase's strict 'never[]' typing on tables without generated types
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any
 
   try {
     // 1. Insert visit record
-    const { data: visitData, error: visitErr } = await supabase
+    const { data: visitData, error: visitErr } = await sb
       .from('visits')
       .insert({
         id: visit.id,
@@ -72,7 +75,7 @@ async function uploadVisit(item: OfflineQueueItem): Promise<boolean> {
     )
 
     const obsRows = resolvedObs.map(o => ({
-      visit_id: visitData.id,
+      visit_id: (visitData as { id: string }).id,
       sku_id: o.sku_id,
       shelf_units: o.shelf_units,
       backroom_status: o.backroom_status,
@@ -81,7 +84,7 @@ async function uploadVisit(item: OfflineQueueItem): Promise<boolean> {
       photo_url: o.photo_url ?? null,
     }))
 
-    const { error: obsErr } = await supabase.from('observations').insert(obsRows)
+    const { error: obsErr } = await sb.from('observations').insert(obsRows)
     if (obsErr) throw obsErr
 
     await dequeue(localId)

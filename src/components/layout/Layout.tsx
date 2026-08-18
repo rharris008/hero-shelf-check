@@ -2,20 +2,65 @@
 // App shell layout — top nav, offline badge, sync indicator
 // ============================================================
 
-import React from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, Outlet } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useSync } from '../../hooks/useSync'
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+}
 
 export function Layout() {
   const { repUser, signOut } = useAuth()
   const { pending, syncing, syncNow } = useSync()
   const location = useLocation()
   const isOnline = navigator.onLine
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [showInstallBanner, setShowInstallBanner] = useState(false)
+
+  useEffect(() => {
+    // Chrome/Android: capture the native install prompt
+    const handler = (e: Event) => {
+      e.preventDefault()
+      setInstallPrompt(e as BeforeInstallPromptEvent)
+      if (!localStorage.getItem('pwa_install_dismissed')) {
+        setShowInstallBanner(true)
+      }
+    }
+    window.addEventListener('beforeinstallprompt', handler)
+
+    // iOS: show manual instructions banner if not in standalone mode
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
+    const isStandalone = ('standalone' in window.navigator) && (window.navigator as { standalone?: boolean }).standalone
+    if (isIos && !isStandalone && !localStorage.getItem('pwa_install_dismissed')) {
+      setShowInstallBanner(true)
+    }
+
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  async function handleInstall() {
+    if (installPrompt) {
+      await installPrompt.prompt()
+      const { outcome } = await installPrompt.userChoice
+      if (outcome === 'accepted') setShowInstallBanner(false)
+      setInstallPrompt(null)
+    }
+  }
+
+  function dismissInstall() {
+    localStorage.setItem('pwa_install_dismissed', '1')
+    setShowInstallBanner(false)
+  }
+
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
 
   const navLinks = [
-    { to: '/check', label: 'Shelf Check' },
-    { to: '/history', label: 'My Visits' },
+    { to: '/check', label: 'Check' },
+    { to: '/route', label: 'Route' },
+    { to: '/history', label: 'History' },
     { to: '/admin', label: 'Dashboard' },
   ]
 
@@ -71,6 +116,34 @@ export function Layout() {
             </button>
           </div>
         </div>
+
+        {/* PWA install banner */}
+        {showInstallBanner && (
+          <div className="bg-abh-blue px-4 py-2 max-w-2xl mx-auto w-full flex items-center justify-between gap-2">
+            <p className="text-white text-xs flex-1">
+              {isIos
+                ? 'Install: tap the Share button then "Add to Home Screen"'
+                : 'Install this app for faster access and offline use'}
+            </p>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {!isIos && installPrompt && (
+                <button
+                  onClick={handleInstall}
+                  className="bg-white text-abh-blue text-xs font-bold rounded px-2 py-1"
+                >
+                  Install
+                </button>
+              )}
+              <button
+                onClick={dismissInstall}
+                className="text-blue-100 text-xs hover:text-white"
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Nav tabs */}
         <nav className="flex border-t border-white border-opacity-20 max-w-2xl mx-auto w-full">
