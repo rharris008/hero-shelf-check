@@ -31,13 +31,6 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
   if (!session) return <Navigate to="/login" replace />
 
-  // Session exists but no rep_users record — signed up, awaiting admin activation
-  if (!repUser) {
-    return (
-      <AccessPendingScreen />
-    )
-  }
-
   return <>{children}</>
 }
 
