@@ -14,6 +14,7 @@ export function LoginPage() {
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
@@ -24,6 +25,7 @@ export function LoginPage() {
     setInfo(null)
     setPassword('')
     setConfirmPassword('')
+    setFullName('')
   }
 
   async function handleLogin(e: React.FormEvent) {
@@ -53,6 +55,10 @@ export function LoginPage() {
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    if (!fullName.trim()) {
+      setError('Please enter your full name.')
+      return
+    }
     if (password !== confirmPassword) {
       setError('Passwords do not match.')
       return
@@ -65,14 +71,16 @@ export function LoginPage() {
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
+      options: { data: { full_name: fullName.trim() } },
     })
     if (error) {
       setError(error.message)
     } else {
-      setInfo('Account created. Check your email to verify, then contact your manager to activate access.')
+      setInfo('Account created. Check your email — click the link to confirm and activate your access.')
       setMode('login')
       setPassword('')
       setConfirmPassword('')
+      setFullName('')
     }
     setLoading(false)
   }
@@ -180,7 +188,13 @@ export function LoginPage() {
         {mode === 'signup' && (
           <form onSubmit={handleSignup} className="space-y-4">
             <h2 className="text-sm font-bold text-abh-navy" style={font}>Create account</h2>
-            <p className="text-xs text-gray-500" style={font}>Your manager will activate your access after sign-up.</p>
+            <p className="text-xs text-gray-500" style={font}>Check your email after sign-up to confirm and activate your account.</p>
+            <div>
+              <label htmlFor="name-signup" className="block text-sm font-medium text-abh-dktext mb-1" style={font}>Full name</label>
+              <input id="name-signup" type="text" autoComplete="name" required
+                value={fullName} onChange={e => setFullName(e.target.value)}
+                className={inputClass} style={font} placeholder="Jane Smith" />
+            </div>
             <div>
               <label htmlFor="email-signup" className="block text-sm font-medium text-abh-dktext mb-1" style={font}>Email</label>
               <input id="email-signup" type="email" autoComplete="email" required
