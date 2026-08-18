@@ -2,7 +2,7 @@
 // App — top-level routing
 // ============================================================
 
-import React from 'react'
+import React, { useState } from 'react'
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { LoginPage } from './components/auth/LoginPage'
@@ -10,6 +10,9 @@ import { Layout } from './components/layout/Layout'
 import { VisitForm } from './components/visits/VisitForm'
 import { VisitHistory } from './components/visits/VisitHistory'
 import { AdminDashboard } from './components/admin/AdminDashboard'
+import { OnboardingModal, hasCompletedOnboarding } from './components/onboarding/OnboardingModal'
+import { TermsModal } from './components/terms/TermsModal'
+import { TermsPage } from './components/terms/TermsPage'
 import { startSyncEngine } from './lib/sync'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -36,16 +39,40 @@ function RequireAdmin({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  const { session } = useAuth()
+  const { session, repUser } = useAuth()
+  const [showTerms, setShowTerms] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
-  // Start sync engine once authenticated
   React.useEffect(() => {
-    if (session) startSyncEngine()
+    if (session) {
+      startSyncEngine()
+    }
   }, [session])
 
+  // When repUser loads, determine which modal to show
+  React.useEffect(() => {
+    if (!repUser) return
+    if (!repUser.terms_accepted_at) {
+      setShowTerms(true)
+      setShowOnboarding(false)
+    } else if (!hasCompletedOnboarding()) {
+      setShowTerms(false)
+      setShowOnboarding(true)
+    }
+  }, [repUser])
+
+  function handleTermsAccepted() {
+    setShowTerms(false)
+    if (!hasCompletedOnboarding()) setShowOnboarding(true)
+  }
+
   return (
+    <>
+      {showTerms && <TermsModal onAccepted={handleTermsAccepted} />}
+      {!showTerms && showOnboarding && <OnboardingModal onDone={() => setShowOnboarding(false)} />}
     <Routes>
       <Route path="/login" element={session ? <Navigate to="/check" replace /> : <LoginPage />} />
+      <Route path="/terms" element={<TermsPage />} />
 
       <Route element={<RequireAuth><Layout /></RequireAuth>}>
         <Route index element={<Navigate to="/check" replace />} />
@@ -64,6 +91,7 @@ function AppRoutes() {
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/check" replace />} />
     </Routes>
+    </>
   )
 }
 

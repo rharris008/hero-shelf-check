@@ -15,6 +15,7 @@ interface AuthContextValue {
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
+  acceptTerms: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -83,6 +84,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut()
   }
 
+  async function acceptTerms() {
+    if (!session?.user) return
+    const now = new Date().toISOString()
+    const { data } = await supabase
+      .from('rep_users')
+      .update({ terms_accepted_at: now })
+      .eq('id', session.user.id)
+      .select()
+      .single()
+    if (data) setRepUser(data as RepUser)
+  }
+
   return (
     <AuthContext.Provider value={{
       session,
@@ -91,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       signIn,
       signOut,
+      acceptTerms,
     }}>
       {children}
     </AuthContext.Provider>

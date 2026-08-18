@@ -85,6 +85,7 @@ export interface RepUser {
   full_name: string
   role: UserRole
   state_territory: string | null  // NSW, VIC, QLD, etc. — Stage 1 region grouping
+  terms_accepted_at: string | null  // ISO timestamp — null means ToS not yet accepted
 }
 
 // Analytics view shape (from Supabase view)
