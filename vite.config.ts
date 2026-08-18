@@ -10,9 +10,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'Hero Shelf Check',
+        name: 'Stock Shelf Checker',
         short_name: 'ShelfCheck',
-        description: 'Pureau shelf availability tracker for field reps',
+        description: 'Pureau stock shelf availability tracker for field reps',
         theme_color: '#1B2A4A',
         background_color: '#ffffff',
         display: 'standalone',

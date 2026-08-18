@@ -10,6 +10,7 @@ import { Layout } from './components/layout/Layout'
 import { VisitForm } from './components/visits/VisitForm'
 import { VisitHistory } from './components/visits/VisitHistory'
 import { AdminDashboard } from './components/admin/AdminDashboard'
+import { RepList } from './components/admin/RepList'
 import { OnboardingModal, hasCompletedOnboarding } from './components/onboarding/OnboardingModal'
 import { TermsModal } from './components/terms/TermsModal'
 import { TermsPage } from './components/terms/TermsPage'
@@ -98,6 +99,14 @@ function AppRoutes() {
           element={
             <RequireAdmin>
               <AdminDashboard />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/reps"
+          element={
+            <RequireAdmin>
+              <RepList />
             </RequireAdmin>
           }
         />

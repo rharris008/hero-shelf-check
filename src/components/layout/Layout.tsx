@@ -57,11 +57,16 @@ export function Layout() {
 
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
 
+  const isAdmin = repUser?.role === 'admin'
+
   const navLinks = [
-    { to: '/check', label: 'Check' },
-    { to: '/route', label: 'Route' },
-    { to: '/history', label: 'History' },
-    { to: '/admin', label: 'Dashboard' },
+    { to: '/check',   label: 'Check'     },
+    { to: '/route',   label: 'Route'     },
+    { to: '/history', label: 'History'   },
+    ...(isAdmin ? [
+      { to: '/admin', label: 'OSA'   },
+      { to: '/reps',  label: 'Reps'  },
+    ] : []),
   ]
 
   return (

@@ -45,14 +45,17 @@ export function StorePicker({ onSelect, retailerFilter, userLat, userLng }: Stor
   const [loading, setLoading] = useState(true)
 
   // Nearest stores — top 3 by haversine distance when location is known
-  const nearest = React.useMemo<Store[]>(() => {
+  const nearest = React.useMemo<Array<{ store: Store; km: number }>>(() => {
     if (userLat == null || userLng == null || allStores.length === 0) return []
-    return allStores
+    const withDist = allStores
       .filter(s => s.latitude != null && s.longitude != null)
-      .map(s => ({ s, km: haversineKm(userLat, userLng, s.latitude!, s.longitude!) }))
+      .map(s => ({ store: s, km: haversineKm(userLat, userLng, s.latitude!, s.longitude!) }))
       .sort((a, b) => a.km - b.km)
-      .slice(0, 3)
-      .map(x => x.s)
+    // Show all stores within 10km, capped at 8
+    const nearby = withDist.filter(x => x.km <= 10).slice(0, 8)
+    // If fewer than 3 within 10km, top up with next closest
+    if (nearby.length < 3) return withDist.slice(0, 5)
+    return nearby
   }, [allStores, userLat, userLng])
 
   // Fetch all active stores from Supabase on mount
@@ -145,10 +148,10 @@ export function StorePicker({ onSelect, retailerFilter, userLat, userLng }: Stor
             <div className="mt-2">
               <p className="text-[10px] text-gray-400 uppercase tracking-wide font-bold mb-1 px-1"
                  style={{ fontFamily: 'Arial, sans-serif' }}>
-                Nearest to you
+                Nearest to you ({nearest.length} stores)
               </p>
               <ul className="space-y-1 mb-3">
-                {nearest.map(store => (
+                {nearest.map(({ store, km }) => (
                   <li key={store.id}>
                     <button
                       onClick={() => handleSelect(store)}
@@ -161,7 +164,7 @@ export function StorePicker({ onSelect, retailerFilter, userLat, userLng }: Stor
                           {RETAILER_LABELS[store.retailer]}
                         </span>
                         <span className="text-[10px] text-abh-blue font-medium">
-                          {haversineKm(userLat!, userLng!, store.latitude!, store.longitude!).toFixed(1)} km
+                          {km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)} km`}
                         </span>
                       </div>
                       <p className="text-sm font-semibold text-abh-dktext" style={{ fontFamily: 'Arial, sans-serif' }}>
