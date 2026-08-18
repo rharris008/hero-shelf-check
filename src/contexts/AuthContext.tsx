@@ -13,6 +13,7 @@ interface AuthContextValue {
   user: User | null
   repUser: RepUser | null
   loading: boolean
+  repLoading: boolean  // true until fetchRepUser has returned at least once
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   acceptTerms: () => Promise<void>
@@ -24,11 +25,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [repUser, setRepUser] = useState<RepUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const [repLoading, setRepLoading] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       if (session?.user) {
+        setRepLoading(true)
         fetchRepUser(session.user.id)
         syncReferenceData()
       }
@@ -38,10 +41,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       if (session?.user) {
+        setRepLoading(true)
         fetchRepUser(session.user.id)
         syncReferenceData()
       }
-      else setRepUser(null)
+      else {
+        setRepUser(null)
+        setRepLoading(false)
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -65,14 +72,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function fetchRepUser(userId: string) {
-    // PLACEHOLDER: rep_users table must exist in Supabase.
-    // Schema defined in database/001_schema.sql.
     const { data } = await supabase
       .from('rep_users')
       .select('*')
       .eq('id', userId)
       .single()
     setRepUser(data as RepUser | null)
+    setRepLoading(false)
   }
 
   async function signIn(email: string, password: string) {
@@ -102,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user: session?.user ?? null,
       repUser,
       loading,
+      repLoading,
       signIn,
       signOut,
       acceptTerms,
