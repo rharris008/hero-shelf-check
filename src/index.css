@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    font-family: Arial, Helvetica, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background-color: #F5F5F5;
+  }
+
+  /* Prevent iOS double-tap zoom on buttons */
+  button, input, select, textarea {
+    touch-action: manipulation;
+  }
+}
+
+@layer utilities {
+  /* Safe area padding for iOS notch */
+  .safe-top    { padding-top: env(safe-area-inset-top); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+}
