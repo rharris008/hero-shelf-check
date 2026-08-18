@@ -56,6 +56,7 @@ export function Layout() {
   }
 
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
 
   const isAdmin = repUser?.role === 'admin'
 
@@ -126,9 +127,11 @@ export function Layout() {
         {showInstallBanner && (
           <div className="bg-abh-blue px-4 py-2 max-w-2xl mx-auto w-full flex items-center justify-between gap-2">
             <p className="text-white text-xs flex-1">
-              {isIos
-                ? 'Install: tap the Share button then "Add to Home Screen"'
-                : 'Install this app for faster access and offline use'}
+              {isIos && !isSafari
+                ? 'Open in Safari to install this app on your home screen'
+                : isIos
+                  ? 'Install: tap the Share button ↑ then "Add to Home Screen"'
+                  : 'Install this app for faster access and offline use'}
             </p>
             <div className="flex items-center gap-2 flex-shrink-0">
               {!isIos && installPrompt && (
