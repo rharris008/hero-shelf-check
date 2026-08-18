@@ -20,17 +20,40 @@ const RETAILER_COLOURS: Record<Retailer, string> = {
   metcash: 'bg-blue-100 text-blue-800',
 }
 
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 interface StorePickerProps {
   onSelect: (store: Store) => void
   retailerFilter?: Retailer
+  userLat?: number
+  userLng?: number
 }
 
-export function StorePicker({ onSelect, retailerFilter }: StorePickerProps) {
+export function StorePicker({ onSelect, retailerFilter, userLat, userLng }: StorePickerProps) {
   const [allStores, setAllStores] = useState<Store[]>([])
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Store[]>([])
   const [selected, setSelected] = useState<Store | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Nearest stores — top 3 by haversine distance when location is known
+  const nearest = React.useMemo<Store[]>(() => {
+    if (userLat == null || userLng == null || allStores.length === 0) return []
+    return allStores
+      .filter(s => s.latitude != null && s.longitude != null)
+      .map(s => ({ s, km: haversineKm(userLat, userLng, s.latitude!, s.longitude!) }))
+      .sort((a, b) => a.km - b.km)
+      .slice(0, 3)
+      .map(x => x.s)
+  }, [allStores, userLat, userLng])
 
   // Fetch all active stores from Supabase on mount
   useEffect(() => {
@@ -116,6 +139,47 @@ export function StorePicker({ onSelect, retailerFilter }: StorePickerProps) {
             style={{ fontFamily: 'Arial, sans-serif' }}
             autoFocus
           />
+
+          {/* Nearest stores — shown when no query typed and location available */}
+          {!loading && query.length === 0 && nearest.length > 0 && (
+            <div className="mt-2">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide font-bold mb-1 px-1"
+                 style={{ fontFamily: 'Arial, sans-serif' }}>
+                Nearest to you
+              </p>
+              <ul className="space-y-1 mb-3">
+                {nearest.map(store => (
+                  <li key={store.id}>
+                    <button
+                      onClick={() => handleSelect(store)}
+                      className="w-full text-left bg-abh-ltgrey rounded-lg px-4 py-2.5 shadow-sm
+                                 hover:bg-abh-blue/10 active:bg-abh-blue/20 transition-colors
+                                 border border-abh-blue/30"
+                    >
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${RETAILER_COLOURS[store.retailer]}`}>
+                          {RETAILER_LABELS[store.retailer]}
+                        </span>
+                        <span className="text-[10px] text-abh-blue font-medium">
+                          {haversineKm(userLat!, userLng!, store.latitude!, store.longitude!).toFixed(1)} km
+                        </span>
+                      </div>
+                      <p className="text-sm font-semibold text-abh-dktext" style={{ fontFamily: 'Arial, sans-serif' }}>
+                        {store.name}
+                      </p>
+                      <p className="text-xs text-gray-500" style={{ fontFamily: 'Arial, sans-serif' }}>
+                        {store.suburb}, {store.state} {store.postcode}
+                      </p>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide font-bold mb-1 px-1"
+                 style={{ fontFamily: 'Arial, sans-serif' }}>
+                Or search all stores
+              </p>
+            </div>
+          )}
 
           {!loading && results.length === 0 && query.length > 1 && (
             <p className="text-center text-sm text-gray-400 mt-3" style={{ fontFamily: 'Arial, sans-serif' }}>

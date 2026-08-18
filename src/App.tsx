@@ -59,7 +59,16 @@ function AccessPendingScreen() {
 }
 
 function RequireAdmin({ children }: { children: React.ReactNode }) {
-  // TODO: restore repUser?.role === 'admin' check once RLS fetch is fixed
+  const { repUser, repLoading } = useAuth()
+  if (repLoading) return null
+  if (!repUser || repUser.role !== 'admin') {
+    return (
+      <div className="text-center py-16 px-6" style={{ fontFamily: 'Arial, sans-serif' }}>
+        <p className="text-sm font-bold text-abh-navy mb-1">Admin access required</p>
+        <p className="text-xs text-gray-400">Contact your manager to request dashboard access.</p>
+      </div>
+    )
+  }
   return <>{children}</>
 }
 

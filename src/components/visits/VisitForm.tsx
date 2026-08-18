@@ -61,6 +61,21 @@ export function VisitForm() {
   const [observations, setObservations] = useState<Map<string, SkuObservation>>(new Map())
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [userLat, setUserLat] = useState<number | null>(null)
+  const [userLng, setUserLng] = useState<number | null>(null)
+
+  // Request geolocation once on mount for nearest-store suggestion
+  React.useEffect(() => {
+    if (!navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setUserLat(pos.coords.latitude)
+        setUserLng(pos.coords.longitude)
+      },
+      () => { /* permission denied — silently continue without geo */ },
+      { timeout: 8000, maximumAge: 60000 }
+    )
+  }, [])
 
   // Use live UUIDs from Supabase; fall back to hardcoded constants if offline/not yet loaded
   const activeSKUs: SKU[] = liveSKUs.length > 0 ? liveSKUs : HERO_SKUS
@@ -150,7 +165,7 @@ export function VisitForm() {
         <h2 className="font-bold text-abh-navy mb-3 text-sm uppercase tracking-wide" style={{ fontFamily: 'Arial, sans-serif' }}>
           1. Select store
         </h2>
-        <StorePicker onSelect={setStore} />
+        <StorePicker onSelect={setStore} userLat={userLat ?? undefined} userLng={userLng ?? undefined} />
       </section>
 
       {/* Step 2: SKU observations — only show when store is selected */}
