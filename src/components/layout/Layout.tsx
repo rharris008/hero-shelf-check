@@ -16,7 +16,7 @@ export function Layout() {
   const navLinks = [
     { to: '/check', label: 'Shelf Check' },
     { to: '/history', label: 'My Visits' },
-    ...(repUser?.role === 'admin' ? [{ to: '/admin', label: 'Dashboard' }] : []),
+    { to: '/admin', label: 'Dashboard' },
   ]
 
   return (
