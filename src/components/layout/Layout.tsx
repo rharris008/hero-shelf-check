@@ -114,7 +114,7 @@ export function Layout() {
   return (
     <div className="min-h-screen bg-abh-ltgrey flex flex-col" style={{ fontFamily: 'Arial, sans-serif' }}>
       {/* Top nav */}
-      <header className="bg-abh-navy text-white">
+      <header className="bg-abh-navy text-white sticky top-0 z-20">
         <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto w-full">
           {/* Brand */}
           <div className="flex items-center gap-2">
