@@ -29,8 +29,10 @@ interface OSAMetrics {
   easyWin: number
   lostSale: number
   noData: number
-  osa: number          // % visited that have stock
-  coverage: number     // % of total that have been visited
+  osa: number           // weighted % (10L×10, 5L×5, 2L×2, 6-pack×1)
+  coverage: number      // % of unique stores visited
+  weightedScore: number // achieved weighted points
+  weightedTotal: number // max possible weighted points for visited combos
 }
 
 // ---- Helpers ------------------------------------------------
@@ -41,6 +43,18 @@ const RETAILER_LABEL: Record<string, string> = {
   metcash: 'Metcash / IGA',
 }
 
+// Weighted OSA: 10L=10, 5L=5, 2L=2, 600ml 6-pack=1
+// Denominators: Coles=18, WW/Metcash=17
+const SKU_WEIGHT: Record<string, number> = {
+  'Pureau 10L Cask':    10,
+  'Pureau 5L Cask':     5,
+  'Pureau 2L Bottle':   2,
+  'Pureau 600ml 6 Pack': 1,
+}
+function skuWeight(name: string): number {
+  return SKU_WEIGHT[name] ?? 1
+}
+
 function computeMetrics(rows: StoreAvailabilitySummary[]): OSAMetrics {
   const visited  = rows.filter(r => r.last_visit_date !== null)
   const inStock  = visited.filter(r => (r.latest_shelf_units ?? 0) > 0)
@@ -48,16 +62,22 @@ function computeMetrics(rows: StoreAvailabilitySummary[]): OSAMetrics {
   const easyWin  = oos.filter(r => r.latest_backroom_status === 'counted' || r.latest_backroom_status === 'not_checked')
   const lostSale = oos.filter(r => r.latest_backroom_status === 'none_present')
   const noData   = rows.filter(r => r.last_visit_date === null)
+
+  const weightedTotal = visited.reduce((s, r) => s + skuWeight(r.sku_name), 0)
+  const weightedScore = inStock.reduce((s, r) => s + skuWeight(r.sku_name), 0)
+
   return {
-    total:    rows.length,
-    visited:  visited.length,
-    inStock:  inStock.length,
-    oos:      oos.length,
-    easyWin:  easyWin.length,
-    lostSale: lostSale.length,
-    noData:   noData.length,
-    osa:      visited.length > 0 ? Math.round(inStock.length / visited.length * 100) : 0,
-    coverage: rows.length > 0 ? Math.round(visited.length / rows.length * 100) : 0,
+    total:         rows.length,
+    visited:       visited.length,
+    inStock:       inStock.length,
+    oos:           oos.length,
+    easyWin:       easyWin.length,
+    lostSale:      lostSale.length,
+    noData:        noData.length,
+    osa:           weightedTotal > 0 ? Math.round(weightedScore / weightedTotal * 100) : 0,
+    coverage:      rows.length > 0 ? Math.round(visited.length / rows.length * 100) : 0,
+    weightedScore,
+    weightedTotal,
   }
 }
 
@@ -542,7 +562,7 @@ export function AdminDashboard() {
                   {ctxMetrics.osa}%
                 </p>
                 <p className="text-[11px] text-blue-300 mt-0.5">
-                  {ctxMetrics.inStock} of {ctxMetrics.visited} visited store/SKU combinations in stock
+                  {ctxMetrics.weightedScore} / {ctxMetrics.weightedTotal} weighted pts · 10L×10, 5L×5, 2L×2
                 </p>
               </div>
               <div className="text-right">
