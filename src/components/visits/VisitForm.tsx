@@ -64,6 +64,7 @@ export function VisitForm() {
   const [observations, setObservations] = useState<Map<string, SkuObservation>>(new Map())
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [validationError, setValidationError] = useState<string | null>(null)
   const [userLat, setUserLat] = useState<number | null>(null)
   const [userLng, setUserLng] = useState<number | null>(null)
 
@@ -109,10 +110,10 @@ export function VisitForm() {
 
     const missingObs = visibleSkus.filter(s => !observations.has(s.id))
     if (missingObs.length > 0) {
-      alert(`Please complete shelf count for: ${missingObs.map(s => s.name).join(', ')}`)
+      setValidationError(`Complete shelf count for: ${missingObs.map(s => s.name).join(', ')}`)
       return
     }
-
+    setValidationError(null)
     setSubmitting(true)
     const { date, time } = makeAestDate()
 
@@ -422,17 +423,27 @@ export function VisitForm() {
         </section>
       )}
 
-      {/* Submit */}
+      {/* Spacer so content isn't hidden behind sticky footer */}
+      {store && <div className="h-20" />}
+
+      {/* Sticky submit footer */}
       {store && (
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full bg-abh-navy text-white font-bold rounded-xl py-4 text-sm
-                     hover:bg-opacity-90 active:bg-opacity-80 disabled:opacity-50 transition-colors shadow-lg"
-          style={{ fontFamily: 'Arial, sans-serif' }}
-        >
-          {submitting ? 'Saving...' : 'Save visit'}
-        </button>
+        <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-100 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
+          {validationError && (
+            <p className="text-xs text-abh-red mb-2 text-center font-medium" style={{ fontFamily: 'Arial, sans-serif' }}>
+              {validationError}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full bg-abh-navy text-white font-bold rounded-xl py-3.5 text-sm
+                       hover:bg-opacity-90 active:bg-opacity-80 disabled:opacity-50 transition-colors"
+            style={{ fontFamily: 'Arial, sans-serif' }}
+          >
+            {submitting ? 'Saving...' : `Save visit${visibleSkus.length > 0 ? ` · ${Array.from(observations.keys()).length}/${visibleSkus.length} SKUs` : ''}`}
+          </button>
+        </div>
       )}
     </form>
   )

@@ -18,7 +18,7 @@ function markOnboardingComplete() {
 const SLIDES = [
   {
     emoji: '👋',
-    title: 'Welcome to Stock Shelf Checker',
+    title: 'Welcome to Pureau Shelf Check',
     body: 'Four quick things and you\'re ready to go.',
     accent: '#1B2A4A',
   },
