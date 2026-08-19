@@ -53,6 +53,9 @@ export function GuestReportPage() {
   const [comment, setComment] = useState('')
   const [storeSearch, setStoreSearch] = useState('')
 
+  const [photo, setPhoto] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -103,11 +106,34 @@ export function GuestReportPage() {
 
   const selectedSku = HERO_SKUS.find(s => s.id === selectedSkuId)
 
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPhoto(file)
+    const url = URL.createObjectURL(file)
+    setPhotoPreview(url)
+  }
+
+  function clearPhoto() {
+    setPhoto(null)
+    if (photoPreview) URL.revokeObjectURL(photoPreview)
+    setPhotoPreview(null)
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!selectedStore || !selectedSkuId) return
     setSubmitting(true)
     setSubmitError(null)
+
+    // Upload photo if provided
+    let photoUrl: string | null = null
+    if (photo) {
+      const ext = photo.name.split('.').pop() ?? 'jpg'
+      const path = `guest/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+      const { data: uploadData } = await supabase.storage.from('shelf-photos').upload(path, photo, { upsert: false })
+      if (uploadData?.path) photoUrl = uploadData.path
+    }
 
     const payload = {
       store_id:           selectedStore.id,
@@ -116,6 +142,7 @@ export function GuestReportPage() {
       shelf_units:        isOos ? 0 : (shelfUnits === '' ? null : parseInt(shelfUnits, 10)),
       is_oos:             isOos,
       comment:            comment.trim() || null,
+      photo_url:          photoUrl,
       reporter_lat:       position?.latitude ?? null,
       reporter_lng:       position?.longitude ?? null,
       distance_to_store_m: (position && (selectedStore as StoreWithDist).distanceKm != null)
@@ -129,6 +156,7 @@ export function GuestReportPage() {
     if (error) {
       setSubmitError(error.message)
     } else {
+      clearPhoto()
       setDone(true)
     }
   }
@@ -393,6 +421,46 @@ export function GuestReportPage() {
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white
                          focus:outline-none focus:ring-2 focus:ring-abh-blue shadow-sm resize-none"
             />
+          </section>
+        )}
+
+        {/* ── STEP 5: Photo (optional) ── */}
+        {selectedStore && selectedSkuId && (
+          <section>
+            <h2 className="text-xs font-bold text-abh-navy uppercase tracking-wide mb-3">
+              5. Photo <span className="text-gray-400 normal-case font-normal">(optional)</span>
+            </h2>
+            {photoPreview ? (
+              <div className="relative rounded-xl overflow-hidden">
+                <img src={photoPreview} alt="Shelf photo" className="w-full object-cover max-h-52 rounded-xl" />
+                <button
+                  type="button"
+                  onClick={clearPhoto}
+                  className="absolute top-2 right-2 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center"
+                >
+                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl py-8 cursor-pointer hover:border-abh-blue hover:bg-blue-50 active:bg-blue-100 transition-colors">
+                <svg className="w-9 h-9 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <p className="text-sm font-semibold text-abh-navy">Tap to add a photo</p>
+                <p className="text-xs text-gray-400 mt-0.5">Take a photo or choose from gallery</p>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handlePhotoChange}
+                />
+              </label>
+            )}
           </section>
         )}
 
