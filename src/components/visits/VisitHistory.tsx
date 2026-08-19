@@ -6,7 +6,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { getQueue } from '../../lib/db'
+import { getQueue, resetAllAttempts } from '../../lib/db'
+import { runSync } from '../../lib/sync'
 import type { OfflineQueueItem } from '../../types'
 
 interface VisitRow {
@@ -96,15 +97,31 @@ export function VisitHistory() {
       {/* Pending offline items */}
       {queued.length > 0 && (
         <div className="bg-amber-50 border border-abh-amber rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-0.5">
-            <div className="w-2 h-2 bg-abh-amber rounded-full animate-pulse" />
-            <p className="text-sm font-semibold text-abh-amber" style={{ fontFamily: 'Arial, sans-serif' }}>
-              {queued.length} visit{queued.length !== 1 ? 's' : ''} waiting to sync
-            </p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <div className="w-2 h-2 bg-abh-amber rounded-full animate-pulse" />
+                <p className="text-sm font-semibold text-abh-amber" style={{ fontFamily: 'Arial, sans-serif' }}>
+                  {queued.length} visit{queued.length !== 1 ? 's' : ''} waiting to sync
+                </p>
+              </div>
+              <p className="text-xs text-amber-600 ml-4" style={{ fontFamily: 'Arial, sans-serif' }}>
+                Will upload automatically when connected.
+              </p>
+            </div>
+            <button
+              onClick={async () => {
+                await resetAllAttempts()
+                await runSync()
+                const q = await getQueue()
+                setQueued(q)
+              }}
+              className="text-xs font-bold text-abh-amber border border-abh-amber rounded-lg px-3 py-1.5 flex-shrink-0 hover:bg-amber-100 active:bg-amber-200"
+              style={{ fontFamily: 'Arial, sans-serif' }}
+            >
+              Retry now
+            </button>
           </div>
-          <p className="text-xs text-amber-600 ml-4" style={{ fontFamily: 'Arial, sans-serif' }}>
-            Will upload automatically when connected.
-          </p>
         </div>
       )}
 

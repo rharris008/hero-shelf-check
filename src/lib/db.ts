@@ -82,3 +82,10 @@ export async function markAttempt(localId: string) {
     item.lastAttempt = now
   })
 }
+
+export async function resetAllAttempts() {
+  await db.queue.toCollection().modify(item => {
+    item.attempts = 0
+    item.lastAttempt = null
+  })
+}
