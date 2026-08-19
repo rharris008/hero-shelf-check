@@ -16,8 +16,6 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [termsAgreed, setTermsAgreed] = useState(false)
-  const [showTermsModal, setShowTermsModal] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -28,8 +26,7 @@ export function LoginPage() {
     setPassword('')
     setConfirmPassword('')
     setFullName('')
-    setTermsAgreed(false)
-  }
+}
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -218,31 +215,10 @@ export function LoginPage() {
                 className={inputClass} style={font} />
             </div>
 
-            {/* T&Cs agreement */}
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={termsAgreed}
-                onChange={e => setTermsAgreed(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded border-abh-mdgrey accent-abh-navy flex-shrink-0"
-              />
-              <span className="text-xs text-gray-600" style={font}>
-                I have read and agree to the{' '}
-                <button
-                  type="button"
-                  onClick={() => setShowTermsModal(true)}
-                  className="text-abh-blue underline hover:text-abh-navy"
-                  style={font}
-                >
-                  Terms of Use
-                </button>
-              </span>
-            </label>
-
             {error && <p className="text-sm text-abh-red bg-red-50 rounded-lg px-3 py-2" style={font}>{error}</p>}
             {info  && <p className="text-sm text-abh-green bg-green-50 rounded-lg px-3 py-2" style={font}>{info}</p>}
 
-            <button type="submit" disabled={loading || !termsAgreed}
+            <button type="submit" disabled={loading}
               className="w-full bg-abh-navy text-white font-semibold rounded-lg py-3 text-sm hover:bg-opacity-90 disabled:opacity-50 transition-colors"
               style={font}>
               {loading ? 'Creating...' : 'Create account'}
@@ -302,44 +278,6 @@ export function LoginPage() {
       </div>
     </div>
 
-    {/* Terms of Use modal — overlays the sign-up form, no navigation */}
-    {showTermsModal && (
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black bg-opacity-60 sm:items-center"
-           onClick={e => { if (e.target === e.currentTarget) setShowTermsModal(false) }}>
-        <div className="bg-white w-full max-w-sm rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden">
-          <div className="bg-abh-navy px-5 py-4 flex items-center justify-between">
-            <div>
-              <p className="text-white font-bold text-sm" style={font}>Terms of Use</p>
-              <p className="text-blue-200 text-xs mt-0.5" style={font}>Australian Beverage Holdings Pty Ltd</p>
-            </div>
-            <button onClick={() => setShowTermsModal(false)}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-white bg-opacity-20 text-white hover:bg-opacity-30">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div className="px-5 py-4 max-h-72 overflow-y-auto text-xs text-gray-700 space-y-3" style={font}>
-            <p><strong>1. Authorised use only.</strong> This application is for authorised Australian Beverage Holdings field representatives only. Your login is personal and non-transferable. You must not share your credentials.</p>
-            <p><strong>2. Data accuracy.</strong> You must record shelf counts and backroom observations accurately and honestly. Falsifying data is grounds for immediate access termination.</p>
-            <p><strong>3. Photography.</strong> Photos captured through this app must relate only to Pureau product placement on shelf. Do not photograph people, private information, or non-Pureau areas without authorisation.</p>
-            <p><strong>4. Confidentiality.</strong> All data, reports, and information you access through this application are confidential to Australian Beverage Holdings Pty Ltd. You must not disclose or distribute this information to any third party.</p>
-            <p><strong>5. Device and connectivity.</strong> You are responsible for ensuring your device meets the app requirements. Offline data will sync automatically when connectivity is restored — you must ensure sync completes before ending a visit period.</p>
-            <p><strong>6. Data stored.</strong> This app stores your visit records, store selections, shelf counts, backroom observations, photos, and device location data (where available). This data is used solely for retail merchandising and compliance reporting by Australian Beverage Holdings Pty Ltd.</p>
-            <p><strong>7. Termination.</strong> Access may be revoked at any time at the discretion of Australian Beverage Holdings Pty Ltd.</p>
-          </div>
-          <div className="px-5 pb-5 pt-3">
-            <button
-              onClick={() => { setTermsAgreed(true); setShowTermsModal(false) }}
-              className="w-full bg-abh-navy text-white font-bold rounded-xl py-3 text-sm"
-              style={font}
-            >
-              I agree — close
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
     </>
   )
 }

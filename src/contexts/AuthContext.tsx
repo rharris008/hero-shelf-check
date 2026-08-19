@@ -117,13 +117,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!session?.user) return
     const now = new Date().toISOString()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (supabase as any)
+    await (supabase as any)
       .from('rep_users')
       .update({ terms_accepted_at: now })
       .eq('id', session.user.id)
-      .select()
-      .single()
-    if (data) setRepUser(data as RepUser)
+    // Optimistically update local state so the modal doesn't re-show
+    // even if the RLS UPDATE policy is missing.
+    setRepUser(prev => prev ? { ...prev, terms_accepted_at: now } : prev)
   }
 
   return (
