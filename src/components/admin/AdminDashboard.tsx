@@ -91,6 +91,12 @@ function osaColor(pct: number): string {
   return '#C0392B'
 }
 
+function coverageColor(pct: number): string {
+  if (pct >= 75) return '#27AE60'
+  if (pct >= 40) return '#E67E22'
+  return '#C0392B'
+}
+
 type StoreGrade = 'A' | 'B' | 'C' | 'N'
 function storeGrade(metrics: OSAMetrics, daysSince: number | null): StoreGrade {
   if (daysSince === null) return 'N'
@@ -222,11 +228,19 @@ function DrillRowFull({ label, sub, metrics, storeCount, onClick, grade }: {
           {sub && <p className="text-[10px] text-gray-400">{sub}</p>}
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-          <div className="text-right">
-            <p className="text-lg font-bold" style={{ color: osaColor(metrics.osa), fontFamily: 'Arial, sans-serif' }}>
-              {metrics.osa}%
-            </p>
-            <p className="text-[9px] text-gray-400">OSA</p>
+          <div className="flex gap-3">
+            <div className="text-right">
+              <p className="text-lg font-bold" style={{ color: osaColor(metrics.osa), fontFamily: 'Arial, sans-serif' }}>
+                {metrics.osa}%
+              </p>
+              <p className="text-[9px] text-gray-400">OSA</p>
+            </div>
+            <div className="text-right border-l border-gray-100 pl-3">
+              <p className="text-lg font-bold" style={{ color: coverageColor(metrics.coverage), fontFamily: 'Arial, sans-serif' }}>
+                {metrics.coverage}%
+              </p>
+              <p className="text-[9px] text-gray-400">covered</p>
+            </div>
           </div>
           <span className="text-abh-blue text-sm">›</span>
         </div>
@@ -234,7 +248,6 @@ function DrillRowFull({ label, sub, metrics, storeCount, onClick, grade }: {
       <OSABar value={metrics.osa} />
       <div className="flex gap-4 mt-2">
         <span className="text-[10px] text-gray-500">{storeCount} {storeCount === 1 ? 'store' : 'stores'}</span>
-        <span className="text-[10px] text-gray-400">{metrics.coverage}% visited</span>
         {metrics.lostSale > 0 && <span className="text-[10px] text-abh-red font-bold">⚠ {metrics.lostSale} lost sales</span>}
         {metrics.easyWin > 0 && <span className="text-[10px] text-abh-amber font-bold">↑ {metrics.easyWin} easy wins</span>}
       </div>
