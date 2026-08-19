@@ -179,9 +179,10 @@ function SKUTable({ rows }: { rows: StoreAvailabilitySummary[] }) {
   const skus = Array.from(new Set(rows.map(r => r.sku_name))).sort()
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="grid grid-cols-5 gap-0 px-3 py-2 bg-abh-navy text-white text-[10px] font-bold uppercase tracking-wide">
+      <div className="grid grid-cols-6 gap-0 px-3 py-2 bg-abh-navy text-white text-[10px] font-bold uppercase tracking-wide">
         <div className="col-span-2">SKU</div>
         <div className="text-center">OSA</div>
+        <div className="text-center">Cov.</div>
         <div className="text-center">OOS</div>
         <div className="text-center">Easy win</div>
       </div>
@@ -189,10 +190,13 @@ function SKUTable({ rows }: { rows: StoreAvailabilitySummary[] }) {
         const skuRows = rows.filter(r => r.sku_name === sku)
         const m = computeMetrics(skuRows)
         return (
-          <div key={sku} className="grid grid-cols-5 gap-0 px-3 py-2 border-t border-gray-100 items-center">
+          <div key={sku} className="grid grid-cols-6 gap-0 px-3 py-2 border-t border-gray-100 items-center">
             <div className="col-span-2 text-xs font-medium text-abh-dktext truncate pr-2">{sku}</div>
             <div className="text-center">
               <span className="text-xs font-bold" style={{ color: osaColor(m.osa) }}>{m.osa}%</span>
+            </div>
+            <div className="text-center">
+              <span className="text-xs font-bold" style={{ color: coverageColor(m.coverage) }}>{m.coverage}%</span>
             </div>
             <div className="text-center text-xs text-abh-red font-bold">{m.oos > 0 ? m.oos : '–'}</div>
             <div className="text-center text-xs text-abh-amber font-bold">{m.easyWin > 0 ? m.easyWin : '–'}</div>
