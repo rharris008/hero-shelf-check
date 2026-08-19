@@ -245,7 +245,7 @@ function DrillRowFull({ label, sub, metrics, storeCount, onClick, grade }: {
           <span className="text-abh-blue text-sm">›</span>
         </div>
       </div>
-      <OSABar value={metrics.osa} />
+      <OSABar value={Math.round(metrics.osa * metrics.coverage / 100)} />
       <div className="flex gap-4 mt-2">
         <span className="text-[10px] text-gray-500">{storeCount} {storeCount === 1 ? 'store' : 'stores'}</span>
         {metrics.lostSale > 0 && <span className="text-[10px] text-abh-red font-bold">⚠ {metrics.lostSale} lost sales</span>}
