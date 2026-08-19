@@ -63,9 +63,12 @@ export function OnboardingModal({ onDone }: OnboardingModalProps) {
   const [slide, setSlide] = useState(0)
   const isLast = slide === SLIDES.length - 1
 
+  // Mark complete on first open — so it never shows again regardless of
+  // whether the user reaches the final slide or skips out early.
+  React.useEffect(() => { markOnboardingComplete() }, [])
+
   function handleNext() {
     if (isLast) {
-      markOnboardingComplete()
       onDone()
     } else {
       setSlide(s => s + 1)
@@ -108,13 +111,21 @@ export function OnboardingModal({ onDone }: OnboardingModalProps) {
 
         {/* Actions */}
         <div className="flex gap-3 px-6 pb-6">
-          {slide > 0 && (
+          {slide > 0 ? (
             <button
               onClick={() => setSlide(s => s - 1)}
               className="flex-1 border border-abh-mdgrey rounded-xl py-3 text-sm font-medium text-abh-dktext"
               style={{ fontFamily: 'Arial, sans-serif' }}
             >
               Back
+            </button>
+          ) : (
+            <button
+              onClick={onDone}
+              className="flex-1 border border-abh-mdgrey rounded-xl py-3 text-sm font-medium text-abh-dktext"
+              style={{ fontFamily: 'Arial, sans-serif' }}
+            >
+              Skip
             </button>
           )}
           <button
