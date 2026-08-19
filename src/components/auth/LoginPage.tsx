@@ -92,6 +92,7 @@ export function LoginPage() {
   const font = { fontFamily: 'Arial, sans-serif' }
 
   return (
+    <>
     <div className="min-h-screen bg-abh-navy flex flex-col items-center justify-center px-4">
       {/* Dual brand logos */}
       <div className="flex items-center justify-between w-full max-w-sm px-2 mb-4">
@@ -339,5 +340,6 @@ export function LoginPage() {
         </div>
       </div>
     )}
+    </>
   )
 }
