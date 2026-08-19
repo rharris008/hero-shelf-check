@@ -399,9 +399,14 @@ export function AdminDashboard() {
     setDrill({ level: 'retailer', retailer, state: null, city: null, storeId: null, storeName: null })
   }
 
-  // Drill into a state
+  // Drill into a state (from retailer path — keeps retailer set)
   function drillState(state: string) {
     setDrill(d => ({ ...d, level: 'state', state, city: null, storeId: null, storeName: null }))
+  }
+
+  // Drill into a state directly from national (state-first path — no retailer filter)
+  function drillStateNational(state: string) {
+    setDrill({ level: 'state', retailer: null, state, city: null, storeId: null, storeName: null })
   }
 
   // Drill into a city
@@ -425,7 +430,16 @@ export function AdminDashboard() {
     })
   }, [allRows])
 
-  // States (retailer level)
+  // States at national level — all retailers combined
+  const statesNational = useMemo(() => {
+    const keys = Array.from(new Set(allRows.map(r => r.state ?? 'Unknown'))).sort()
+    return keys.map(state => {
+      const rows = allRows.filter(r => (r.state ?? 'Unknown') === state)
+      return { state, rows, metrics: computeMetrics(rows), storeCount: uniqueStores(rows) }
+    })
+  }, [allRows])
+
+  // States (retailer level — filtered to selected retailer)
   const states = useMemo(() => {
     if (!drill.retailer) return []
     const keys = Array.from(new Set(ctxRows.map(r => r.state ?? 'Unknown'))).sort()
@@ -621,6 +635,20 @@ export function AdminDashboard() {
                 metrics={metrics}
                 storeCount={storeCount}
                 onClick={() => drillRetailer(retailer as Retailer)}
+              />
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-[11px] text-gray-400 uppercase tracking-wide font-bold px-1">By State</p>
+            {statesNational.map(({ state, metrics, storeCount }) => (
+              <DrillRowFull
+                key={state}
+                label={state}
+                sub={`${storeCount} ${storeCount === 1 ? 'store' : 'stores'} · all retailers`}
+                metrics={metrics}
+                storeCount={storeCount}
+                onClick={() => drillStateNational(state)}
               />
             ))}
           </div>
