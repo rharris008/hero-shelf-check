@@ -14,12 +14,18 @@ interface TermsModalProps {
 export function TermsModal({ onAccepted }: TermsModalProps) {
   const { acceptTerms, signOut } = useAuth()
   const [accepting, setAccepting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function handleAccept() {
     setAccepting(true)
-    await acceptTerms()
+    setError(null)
+    const err = await acceptTerms()
     setAccepting(false)
-    onAccepted()
+    if (err) {
+      setError('Could not record acceptance — please try again.')
+    } else {
+      onAccepted()
+    }
   }
 
   return (
@@ -48,6 +54,11 @@ export function TermsModal({ onAccepted }: TermsModalProps) {
           <p><strong>7. Termination.</strong> Access may be revoked at any time at the discretion of Australian Beverage Holdings Pty Ltd.</p>
           <p className="text-gray-400 pt-1">By tapping Accept below, you agree to these Terms of Use. Your acceptance is recorded with a timestamp.</p>
         </div>
+
+        {error && (
+          <p className="mx-5 mb-2 text-xs text-abh-red bg-red-50 rounded-lg px-3 py-2"
+             style={{ fontFamily: 'Arial, sans-serif' }}>{error}</p>
+        )}
 
         {/* Actions */}
         <div className="px-5 pb-6 pt-3 flex gap-3">

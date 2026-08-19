@@ -18,7 +18,7 @@ interface AuthContextValue {
   storeVersion: number
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
-  acceptTerms: () => Promise<void>
+  acceptTerms: () => Promise<string | null>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -92,11 +92,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', userId)
         .maybeSingle()
       if (error) {
-        console.error('[auth] fetchRepUser attempt', attempt + 1, 'error:', error.code, error.message)
-        localStorage.setItem('__shelf_repuser_error', JSON.stringify({ attempt, code: error.code, msg: error.message, userId }))
+        console.error('[auth] fetchRepUser attempt', attempt + 1, 'error:', error.code)
         if (attempt < 2) continue
       }
-      localStorage.setItem('__shelf_repuser_debug', JSON.stringify({ userId, data, errorCode: error?.code ?? null }))
       setRepUser(data as RepUser | null)
       setRepLoading(false)
       return
@@ -113,17 +111,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut()
   }
 
-  async function acceptTerms() {
-    if (!session?.user) return
+  async function acceptTerms(): Promise<string | null> {
+    if (!session?.user) return 'Not signed in'
     const now = new Date().toISOString()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any)
+    const { error } = await (supabase as any)
       .from('rep_users')
       .update({ terms_accepted_at: now })
       .eq('id', session.user.id)
+    if (error) return error.message
     // Optimistically update local state so the modal doesn't re-show
-    // even if the RLS UPDATE policy is missing.
+    // even if there is a brief propagation delay.
     setRepUser(prev => prev ? { ...prev, terms_accepted_at: now } : prev)
+    return null
   }
 
   return (

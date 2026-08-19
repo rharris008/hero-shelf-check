@@ -131,7 +131,12 @@ export function GuestReportPage() {
     if (photo) {
       const ext = photo.name.split('.').pop() ?? 'jpg'
       const path = `guest/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
-      const { data: uploadData } = await supabase.storage.from('shelf-photos').upload(path, photo, { upsert: false })
+      const { data: uploadData, error: uploadError } = await supabase.storage.from('shelf-photos').upload(path, photo, { upsert: false })
+      if (uploadError) {
+        setSubmitError('Photo upload failed — please try again or submit without a photo.')
+        setSubmitting(false)
+        return
+      }
       if (uploadData?.path) photoUrl = uploadData.path
     }
 
@@ -178,6 +183,7 @@ export function GuestReportPage() {
           onClick={() => {
             setDone(false)
             setSelectedStore(null)
+            setStoreSearch('')
             setSelectedSkuId('')
             setShelfUnits('')
             setIsOos(false)

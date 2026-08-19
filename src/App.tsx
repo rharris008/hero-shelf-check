@@ -16,6 +16,7 @@ import { TermsModal } from './components/terms/TermsModal'
 import { TermsPage } from './components/terms/TermsPage'
 import { GuestReportPage } from './components/guest/GuestReportPage'
 import { RoutePlanner } from './components/route/RoutePlanner'
+import { PasswordResetPage } from './components/auth/PasswordResetPage'
 import { startSyncEngine } from './lib/sync'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -119,6 +120,7 @@ function AppRoutes() {
       {!showTerms && showOnboarding && <OnboardingModal onDone={() => setShowOnboarding(false)} />}
     <Routes>
       <Route path="/login" element={session ? <Navigate to="/check" replace /> : <LoginPage />} />
+      <Route path="/reset-password" element={<PasswordResetPage />} />
       <Route path="/terms" element={<TermsPage />} />
       <Route path="/report" element={<GuestReportPage />} />
 

@@ -7,17 +7,17 @@ interface RegionDef {
 }
 
 const QLD_REGIONS: RegionDef[] = [
-  { name: 'Brisbane',       ranges: [[4000, 4099], [4100, 4199], [4300, 4349]] },
+  { name: 'Brisbane',       ranges: [[4000, 4099], [4100, 4199]] },
   { name: 'Gold Coast',     ranges: [[4200, 4299]] },
+  { name: 'Ipswich',        ranges: [[4300, 4349]] },
+  { name: 'Toowoomba',      ranges: [[4350, 4499]] },
   { name: 'Sunshine Coast', ranges: [[4500, 4519], [4550, 4579]] },
-  { name: 'Ipswich',        ranges: [[4350, 4399]] },
   { name: 'Bundaberg',      ranges: [[4670, 4679]] },
   { name: 'Rockhampton',    ranges: [[4700, 4739]] },
   { name: 'Mackay',         ranges: [[4740, 4749]] },
   { name: 'Townsville',     ranges: [[4810, 4819]] },
   { name: 'Cairns',         ranges: [[4870, 4879]] },
   { name: 'Mt Isa',         ranges: [[4820, 4830]] },
-  { name: 'Toowoomba',      ranges: [[4350, 4359]] },
 ]
 
 const NSW_REGIONS: RegionDef[] = [

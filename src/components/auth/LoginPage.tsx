@@ -68,14 +68,18 @@ export function LoginPage() {
       return
     }
     setLoading(true)
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: { data: { full_name: fullName.trim() } },
     })
     if (error) {
       setError(error.message)
+    } else if (data.session) {
+      // Email confirmation disabled — session is live immediately.
+      // AuthContext onAuthStateChange fires automatically; nothing to do here.
     } else {
+      // Email confirmation enabled — send user to check-inbox screen.
       setInfo(email.trim())
       setMode('check-email')
       setPassword('')

@@ -13,7 +13,7 @@ import type { Store, SKU, SkuObservation, BackroomStatus, Retailer } from '../..
 import { HERO_SKUS } from '../../types'
 
 async function compressImage(file: File): Promise<string> {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     const img = new Image()
     const url = URL.createObjectURL(file)
     img.onload = () => {
@@ -23,9 +23,12 @@ async function compressImage(file: File): Promise<string> {
       const canvas = document.createElement('canvas')
       canvas.width  = Math.round(img.width  * scale)
       canvas.height = Math.round(img.height * scale)
-      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { reject(new Error('Canvas unavailable')); return }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
       resolve(canvas.toDataURL('image/jpeg', 0.80))
     }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read image file')) }
     img.src = url
   })
 }
@@ -239,13 +242,13 @@ export function VisitForm() {
               2. Shelf availability
             </h2>
             <span className="text-xs text-gray-400" style={{ fontFamily: 'Arial, sans-serif' }}>
-              {Array.from(observations.values()).filter(o => o.backroom_status != null).length}/{visibleSkus.length} done
+              {Array.from(observations.values()).filter(o => o.backroom_status != null && o.backroom_status !== 'not_checked').length}/{visibleSkus.length} done
             </span>
           </div>
 
           {visibleSkus.map(sku => {
             const obs = observations.get(sku.id)
-            const isDone = obs != null && obs.backroom_status != null
+            const isDone = obs != null && obs.backroom_status != null && obs.backroom_status !== 'not_checked'
             const isOOS = (obs?.shelf_units ?? -1) === 0
 
             return (
