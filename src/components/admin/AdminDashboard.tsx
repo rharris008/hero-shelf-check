@@ -584,7 +584,7 @@ export function AdminDashboard() {
                 <p className="text-[11px] text-blue-300 mt-0.5">{ctxMetrics.noData} never visited</p>
               </div>
             </div>
-            <OSABar value={ctxMetrics.osa} size="lg" />
+            <OSABar value={Math.round(ctxMetrics.osa * ctxMetrics.coverage / 100)} size="lg" />
           </div>
 
           {/* KPI tiles */}
