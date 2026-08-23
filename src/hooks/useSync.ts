@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react'
 import { onSyncUpdate, runSync } from '../lib/sync'
-import { getQueue } from '../lib/db'
+import { getQueue, resetAllAttempts } from '../lib/db'
 
 export function useSync() {
   const [pending, setPending] = useState(0)
@@ -21,6 +21,7 @@ export function useSync() {
 
   async function syncNow() {
     setSyncing(true)
+    await resetAllAttempts()
     await runSync()
     setSyncing(false)
   }
