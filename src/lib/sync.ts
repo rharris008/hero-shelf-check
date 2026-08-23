@@ -6,6 +6,13 @@
 import { supabase } from './supabase'
 import { getQueue, dequeue, markAttempt } from './db'
 import type { OfflineQueueItem, SkuObservation } from '../types'
+import { HERO_SKUS } from '../types'
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+// Fallback IDs (e.g. 'sku-10l') → SKU code → real Supabase UUID
+// Used when liveSKUs hadn't loaded yet at capture time.
+const FALLBACK_ID_TO_CODE = new Map(HERO_SKUS.map(s => [s.id, s.code]))
 
 async function uploadPhoto(visitId: string, skuId: string, blob: string): Promise<string | null> {
   const base64 = blob.replace(/^data:image\/\w+;base64,/, '')
@@ -66,13 +73,29 @@ async function uploadVisit(item: OfflineQueueItem): Promise<boolean> {
     }
 
     // 2. Upload any queued photos, then insert observations
-    const resolvedObs: SkuObservation[] = await Promise.all(
+    let resolvedObs: SkuObservation[] = await Promise.all(
       visit.observations.map(async o => {
         if (!o.photo_blob) return o
         const path = await uploadPhoto(visit.id, o.sku_id, o.photo_blob)
         return { ...o, photo_blob: null, photo_url: path }
       })
     )
+
+    // Remap any fallback IDs (e.g. 'sku-10l') to real Supabase UUIDs.
+    // This happens when liveSKUs hadn't loaded at capture time.
+    const hasFallback = resolvedObs.some(o => !UUID_REGEX.test(o.sku_id))
+    if (hasFallback) {
+      const { data: skuRows } = await sb.from('skus').select('id, code').eq('is_active', true)
+      if (skuRows) {
+        const codeToUUID = new Map((skuRows as { id: string; code: string }[]).map(s => [s.code, s.id]))
+        resolvedObs = resolvedObs.map(o => {
+          if (UUID_REGEX.test(o.sku_id)) return o
+          const code = FALLBACK_ID_TO_CODE.get(o.sku_id)
+          const realId = code ? codeToUUID.get(code) : null
+          return realId ? { ...o, sku_id: realId } : o
+        })
+      }
+    }
 
     const obsRows = resolvedObs.map(o => ({
       visit_id: (visitData as { id: string }).id,
