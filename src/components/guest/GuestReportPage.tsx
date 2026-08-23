@@ -1,13 +1,10 @@
-// ============================================================
 // GuestReportPage — public form, no auth required
-// Geo-detects nearest Pureau stores, collects shelf count
-// ============================================================
+// Multi-SKU: submit one row per SKU in a single batch insert
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { HERO_SKUS, type Store } from '../../types'
 
-// Haversine distance in km
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -29,6 +26,12 @@ interface StoreWithDist extends Store {
   distanceKm: number
 }
 
+interface SkuEntry {
+  shelfUnits: string
+  isOos: boolean
+  comment: string
+}
+
 const RETAILER_BADGE: Record<string, string> = {
   woolworths: 'bg-green-100 text-green-800',
   coles:      'bg-red-100 text-red-800',
@@ -45,22 +48,21 @@ export function GuestReportPage() {
   const [geoState, setGeoState] = useState<GeoState>('requesting')
   const [position, setPosition] = useState<{ latitude: number; longitude: number } | null>(null)
   const [nearbyStores, setNearbyStores] = useState<StoreWithDist[]>([])
-
   const [selectedStore, setSelectedStore] = useState<Store | null>(null)
-  const [selectedSkuId, setSelectedSkuId] = useState('')
-  const [shelfUnits, setShelfUnits] = useState('')
-  const [isOos, setIsOos] = useState(false)
-  const [comment, setComment] = useState('')
   const [storeSearch, setStoreSearch] = useState('')
 
+  // Per-SKU data: Map<sku.id, SkuEntry>
+  const [skuData, setSkuData] = useState<Map<string, SkuEntry>>(new Map())
+
+  // Single photo for the whole submission
   const [photo, setPhoto] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
 
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
 
-  // Fetch all stores (anon access) and request geo in parallel on mount
   useEffect(() => {
     supabase
       .from('stores')
@@ -69,21 +71,14 @@ export function GuestReportPage() {
       .order('name')
       .then(({ data }) => { if (data) setStores(data as Store[]) })
 
-    if (!navigator.geolocation) {
-      setGeoState('unavailable')
-      return
-    }
+    if (!navigator.geolocation) { setGeoState('unavailable'); return }
     navigator.geolocation.getCurrentPosition(
-      pos => {
-        setPosition({ latitude: pos.coords.latitude, longitude: pos.coords.longitude })
-        setGeoState('granted')
-      },
+      pos => { setPosition({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }); setGeoState('granted') },
       () => setGeoState('denied'),
       { timeout: 12000, enableHighAccuracy: false, maximumAge: 60000 }
     )
   }, [])
 
-  // Recompute nearest stores whenever position or store list changes
   useEffect(() => {
     if (!position || stores.length === 0) return
     const ranked = stores
@@ -93,6 +88,9 @@ export function GuestReportPage() {
       .slice(0, 3)
     setNearbyStores(ranked)
   }, [position, stores])
+
+  // Reset SKU data when store changes
+  useEffect(() => { setSkuData(new Map()) }, [selectedStore])
 
   const filteredStores = useCallback((): Store[] => {
     const q = storeSearch.toLowerCase().trim()
@@ -104,7 +102,18 @@ export function GuestReportPage() {
     ).slice(0, 6)
   }, [storeSearch, stores])
 
-  const selectedSku = HERO_SKUS.find(s => s.id === selectedSkuId)
+  const visibleSkus = selectedStore
+    ? HERO_SKUS.filter(s => s.retailers.includes(selectedStore.retailer as any))
+    : []
+
+  function updateSku(skuId: string, patch: Partial<SkuEntry>) {
+    setSkuData(prev => {
+      const next = new Map(prev)
+      const existing = next.get(skuId) ?? { shelfUnits: '', isOos: false, comment: '' }
+      next.set(skuId, { ...existing, ...patch })
+      return next
+    })
+  }
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -120,9 +129,21 @@ export function GuestReportPage() {
     setPhotoPreview(null)
   }
 
+  // SKUs that have been touched (isOos OR shelfUnits set)
+  const filledSkus = visibleSkus.filter(s => {
+    const d = skuData.get(s.id)
+    return d && (d.isOos || d.shelfUnits !== '')
+  })
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!selectedStore || !selectedSkuId) return
+    if (!selectedStore) return
+
+    if (filledSkus.length === 0) {
+      setValidationError('Please fill in at least one SKU before submitting.')
+      return
+    }
+    setValidationError(null)
     setSubmitting(true)
     setSubmitError(null)
 
@@ -140,23 +161,27 @@ export function GuestReportPage() {
       if (uploadData?.path) photoUrl = uploadData.path
     }
 
-    const payload = {
-      store_id:           selectedStore.id,
-      sku_id:             selectedSkuId,
-      sku_name:           selectedSku?.name ?? selectedSkuId,
-      shelf_units:        isOos ? 0 : (shelfUnits === '' ? null : parseInt(shelfUnits, 10)),
-      is_oos:             isOos,
-      comment:            comment.trim() || null,
-      photo_url:          photoUrl,
-      reporter_lat:       position?.latitude ?? null,
-      reporter_lng:       position?.longitude ?? null,
-      distance_to_store_m: (position && (selectedStore as StoreWithDist).distanceKm != null)
-        ? Math.round((selectedStore as StoreWithDist).distanceKm * 1000)
-        : null,
-    }
+    const distanceKm = position && (selectedStore as StoreWithDist).distanceKm != null
+      ? (selectedStore as StoreWithDist).distanceKm
+      : null
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any).from('guest_reports').insert(payload)
+    const rows = filledSkus.map(sku => {
+      const d = skuData.get(sku.id)!
+      return {
+        store_id:             selectedStore.id,
+        sku_id:               sku.id,
+        sku_name:             sku.name,
+        shelf_units:          d.isOos ? 0 : (d.shelfUnits === '' ? null : parseInt(d.shelfUnits, 10)),
+        is_oos:               d.isOos,
+        comment:              d.comment.trim() || null,
+        photo_url:            photoUrl,
+        reporter_lat:         position?.latitude ?? null,
+        reporter_lng:         position?.longitude ?? null,
+        distance_to_store_m:  distanceKm != null ? Math.round(distanceKm * 1000) : null,
+      }
+    })
+
+    const { error } = await (supabase as any).from('guest_reports').insert(rows)
     setSubmitting(false)
     if (error) {
       setSubmitError(error.message)
@@ -177,17 +202,14 @@ export function GuestReportPage() {
         </div>
         <p className="text-white font-bold text-xl mb-2">Report submitted</p>
         <p className="text-blue-200 text-sm max-w-xs mb-8">
-          Thank you for helping Pureau track shelf availability. Your report has been logged.
+          Thank you for helping Pureau track shelf availability. {filledSkus.length} SKU{filledSkus.length !== 1 ? 's' : ''} logged.
         </p>
         <button
           onClick={() => {
             setDone(false)
             setSelectedStore(null)
             setStoreSearch('')
-            setSelectedSkuId('')
-            setShelfUnits('')
-            setIsOos(false)
-            setComment('')
+            setSkuData(new Map())
           }}
           className="text-sm text-abh-blue underline"
         >
@@ -199,7 +221,6 @@ export function GuestReportPage() {
 
   return (
     <div className="min-h-screen bg-gray-50" style={{ fontFamily: 'Arial, sans-serif' }}>
-      {/* Header */}
       <div className="bg-abh-navy px-5 py-4">
         <p className="text-white font-bold text-sm leading-none">Pureau Shelf Report</p>
         <p className="text-blue-300 text-xs mt-0.5">Spotted a gap? Takes 30 seconds.</p>
@@ -209,9 +230,7 @@ export function GuestReportPage() {
 
         {/* ── STEP 1: Store ── */}
         <section>
-          <h2 className="text-xs font-bold text-abh-navy uppercase tracking-wide mb-3">
-            1. Select Store
-          </h2>
+          <h2 className="text-xs font-bold text-abh-navy uppercase tracking-wide mb-3">1. Select Store</h2>
 
           {selectedStore ? (
             <div className="bg-white rounded-xl border-2 border-abh-blue p-4 flex items-start justify-between shadow-sm">
@@ -224,17 +243,13 @@ export function GuestReportPage() {
                 <p className="font-semibold text-abh-dktext text-sm">{selectedStore.name}</p>
                 <p className="text-xs text-gray-500">{selectedStore.suburb}, {selectedStore.state}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setSelectedStore(null)}
-                className="text-abh-blue text-sm font-medium ml-4 flex-shrink-0"
-              >
+              <button type="button" onClick={() => setSelectedStore(null)}
+                className="text-abh-blue text-sm font-medium ml-4 flex-shrink-0">
                 Change
               </button>
             </div>
           ) : (
             <div className="space-y-3">
-              {/* Geo status banner */}
               {geoState === 'requesting' && (
                 <div className="flex items-center gap-2 text-sm text-gray-500 bg-white rounded-xl px-4 py-3 border border-gray-200">
                   <svg className="w-4 h-4 animate-spin flex-shrink-0 text-abh-blue" fill="none" viewBox="0 0 24 24">
@@ -245,19 +260,14 @@ export function GuestReportPage() {
                 </div>
               )}
 
-              {/* Nearest stores (geo granted) */}
               {geoState === 'granted' && nearbyStores.length > 0 && (
                 <div>
                   <p className="text-xs text-gray-500 mb-2">Nearest stores</p>
                   <ul className="space-y-2">
                     {nearbyStores.map(s => (
                       <li key={s.id}>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedStore(s)}
-                          className="w-full text-left bg-white rounded-xl px-4 py-3 border border-gray-200
-                                     hover:border-abh-blue hover:bg-blue-50 active:bg-blue-100 transition-colors shadow-sm"
-                        >
+                        <button type="button" onClick={() => setSelectedStore(s)}
+                          className="w-full text-left bg-white rounded-xl px-4 py-3 border border-gray-200 hover:border-abh-blue hover:bg-blue-50 active:bg-blue-100 transition-colors shadow-sm">
                           <div className="flex items-center justify-between">
                             <div>
                               <div className="flex items-center gap-2 mb-0.5">
@@ -279,7 +289,6 @@ export function GuestReportPage() {
                 </div>
               )}
 
-              {/* Denied / unavailable message */}
               {(geoState === 'denied' || geoState === 'unavailable') && (
                 <div className="text-xs text-gray-500 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3">
                   {geoState === 'denied'
@@ -288,18 +297,14 @@ export function GuestReportPage() {
                 </div>
               )}
 
-              {/* Manual search — always shown below geo list */}
               <div>
-                {nearbyStores.length > 0 && (
-                  <p className="text-xs text-gray-500 mb-2 mt-1">Or search</p>
-                )}
+                {nearbyStores.length > 0 && <p className="text-xs text-gray-500 mb-2 mt-1">Or search</p>}
                 <input
                   type="search"
                   value={storeSearch}
                   onChange={e => setStoreSearch(e.target.value)}
                   placeholder="Store name, suburb or postcode..."
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white
-                             focus:outline-none focus:ring-2 focus:ring-abh-blue shadow-sm"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-abh-blue shadow-sm"
                 />
                 {storeSearch.length > 1 && (
                   <ul className="mt-2 space-y-1">
@@ -307,12 +312,8 @@ export function GuestReportPage() {
                       <li className="text-xs text-gray-400 px-4 py-2">No stores found.</li>
                     ) : filteredStores().map(s => (
                       <li key={s.id}>
-                        <button
-                          type="button"
-                          onClick={() => { setSelectedStore(s); setStoreSearch('') }}
-                          className="w-full text-left bg-white rounded-xl px-4 py-3 border border-gray-200
-                                     hover:border-abh-blue hover:bg-blue-50 active:bg-blue-100 transition-colors shadow-sm"
-                        >
+                        <button type="button" onClick={() => { setSelectedStore(s); setStoreSearch('') }}
+                          className="w-full text-left bg-white rounded-xl px-4 py-3 border border-gray-200 hover:border-abh-blue hover:bg-blue-50 active:bg-blue-100 transition-colors shadow-sm">
                           <div className="flex items-center gap-2 mb-0.5">
                             <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${RETAILER_BADGE[s.retailer]}`}>
                               {RETAILER_LABELS[s.retailer]}
@@ -330,120 +331,95 @@ export function GuestReportPage() {
           )}
         </section>
 
-        {/* ── STEP 2: SKU ── */}
+        {/* ── STEP 2: SKUs ── */}
+        {selectedStore && (
+          <section>
+            <h2 className="text-xs font-bold text-abh-navy uppercase tracking-wide mb-1">2. Shelf Status</h2>
+            <p className="text-[10px] text-gray-400 mb-3">Fill in any SKUs you checked. Skip ones you didn't look at.</p>
+            <div className="space-y-3">
+              {visibleSkus.map(sku => {
+                const d = skuData.get(sku.id) ?? { shelfUnits: '', isOos: false, comment: '' }
+                const touched = d.isOos || d.shelfUnits !== ''
+                return (
+                  <div key={sku.id}
+                    className={`bg-white rounded-xl border-2 p-4 shadow-sm transition-colors ${touched ? 'border-abh-green' : 'border-transparent'}`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-semibold text-abh-dktext">{sku.name}</p>
+                      {touched && (
+                        <div className="w-5 h-5 bg-abh-green rounded-full flex items-center justify-center flex-shrink-0">
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* OOS toggle */}
+                    <button
+                      type="button"
+                      onClick={() => updateSku(sku.id, { isOos: !d.isOos, shelfUnits: !d.isOos ? '0' : '' })}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg mb-3 transition-colors ${d.isOos ? 'bg-red-50' : 'bg-abh-ltgrey hover:bg-gray-200'}`}
+                    >
+                      <span className="text-xs font-semibold text-abh-dktext">Out of stock</span>
+                      <div className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${d.isOos ? 'bg-red-500 justify-end' : 'bg-gray-300 justify-start'}`}>
+                        <div className="w-4 h-4 bg-white rounded-full shadow-sm" />
+                      </div>
+                    </button>
+
+                    {/* Shelf units — hidden when OOS */}
+                    {!d.isOos && (
+                      <div className="mb-3">
+                        <label className="block text-xs text-gray-500 mb-2">Units on shelf</label>
+                        <div className="flex items-center gap-3">
+                          <button type="button"
+                            onClick={() => updateSku(sku.id, { shelfUnits: String(Math.max(0, parseInt(d.shelfUnits || '0', 10) - 1)) })}
+                            className="w-10 h-10 rounded-xl bg-abh-ltgrey text-abh-navy font-bold text-xl flex items-center justify-center active:bg-gray-300 flex-shrink-0">
+                            −
+                          </button>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min="0"
+                            value={d.shelfUnits}
+                            onChange={e => updateSku(sku.id, { shelfUnits: e.target.value })}
+                            placeholder="–"
+                            className="flex-1 border border-abh-mdgrey rounded-xl px-3 py-2.5 text-lg font-bold text-center focus:outline-none focus:ring-2 focus:ring-abh-blue min-w-0"
+                          />
+                          <button type="button"
+                            onClick={() => updateSku(sku.id, { shelfUnits: String(parseInt(d.shelfUnits || '0', 10) + 1) })}
+                            className="w-10 h-10 rounded-xl bg-abh-blue text-white font-bold text-xl flex items-center justify-center active:bg-blue-700 flex-shrink-0">
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Comment */}
+                    <input
+                      type="text"
+                      value={d.comment}
+                      onChange={e => updateSku(sku.id, { comment: e.target.value })}
+                      placeholder="Notes (optional)"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-abh-blue"
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* ── STEP 3: Photo ── */}
         {selectedStore && (
           <section>
             <h2 className="text-xs font-bold text-abh-navy uppercase tracking-wide mb-3">
-              2. Select Product
-            </h2>
-            <div className="grid grid-cols-2 gap-2">
-              {HERO_SKUS
-                .filter(sku => sku.retailers.includes(selectedStore.retailer))
-                .map(sku => (
-                  <button
-                    key={sku.id}
-                    type="button"
-                    onClick={() => setSelectedSkuId(sku.id)}
-                    className={`rounded-xl border-2 px-3 py-3 text-left transition-colors
-                      ${selectedSkuId === sku.id
-                        ? 'border-abh-blue bg-blue-50'
-                        : 'border-gray-200 bg-white hover:border-gray-300'}`}
-                  >
-                    <p className="text-xs font-bold text-abh-navy">{sku.code}</p>
-                    <p className="text-xs text-gray-600 mt-0.5 leading-tight">{sku.name}</p>
-                  </button>
-                ))}
-            </div>
-          </section>
-        )}
-
-        {/* ── STEP 3: Shelf count ── */}
-        {selectedStore && selectedSkuId && (
-          <section>
-            <h2 className="text-xs font-bold text-abh-navy uppercase tracking-wide mb-3">
-              3. Shelf Status
-            </h2>
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              {/* OOS toggle */}
-              <button
-                type="button"
-                onClick={() => { setIsOos(!isOos); if (!isOos) setShelfUnits('0') }}
-                className={`w-full flex items-center justify-between px-4 py-3 transition-colors
-                  ${isOos ? 'bg-red-50' : 'hover:bg-gray-50'}`}
-              >
-                <span className="text-sm font-semibold text-abh-dktext">Out of stock</span>
-                <div className={`w-10 h-6 rounded-full transition-colors flex items-center px-0.5
-                  ${isOos ? 'bg-red-500 justify-end' : 'bg-gray-200 justify-start'}`}>
-                  <div className="w-5 h-5 bg-white rounded-full shadow-sm" />
-                </div>
-              </button>
-
-              {/* Shelf units (hidden when OOS) */}
-              {!isOos && (
-                <div className="px-4 py-3 border-t border-gray-100">
-                  <label className="text-xs text-gray-500 block mb-2">Units on shelf</label>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setShelfUnits(u => String(Math.max(0, parseInt(u || '0', 10) - 1)))}
-                      className="w-10 h-10 rounded-full bg-gray-100 text-xl font-bold text-abh-navy
-                                 flex items-center justify-center hover:bg-gray-200 active:bg-gray-300"
-                    >−</button>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min="0"
-                      max="999"
-                      value={shelfUnits}
-                      onChange={e => setShelfUnits(e.target.value)}
-                      placeholder="0"
-                      className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-lg font-bold text-center
-                                 focus:outline-none focus:ring-2 focus:ring-abh-blue"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShelfUnits(u => String(parseInt(u || '0', 10) + 1))}
-                      className="w-10 h-10 rounded-full bg-abh-navy text-xl font-bold text-white
-                                 flex items-center justify-center hover:bg-opacity-80 active:bg-opacity-70"
-                    >+</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* ── STEP 4: Comment (optional) ── */}
-        {selectedStore && selectedSkuId && (
-          <section>
-            <h2 className="text-xs font-bold text-abh-navy uppercase tracking-wide mb-3">
-              4. Notes <span className="text-gray-400 normal-case font-normal">(optional)</span>
-            </h2>
-            <textarea
-              value={comment}
-              onChange={e => setComment(e.target.value)}
-              placeholder="Anything else to note — empty bay, incorrect label, facing issue?"
-              rows={2}
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white
-                         focus:outline-none focus:ring-2 focus:ring-abh-blue shadow-sm resize-none"
-            />
-          </section>
-        )}
-
-        {/* ── STEP 5: Photo (optional) ── */}
-        {selectedStore && selectedSkuId && (
-          <section>
-            <h2 className="text-xs font-bold text-abh-navy uppercase tracking-wide mb-3">
-              5. Photo <span className="text-gray-400 normal-case font-normal">(optional)</span>
+              3. Photo <span className="text-gray-400 normal-case font-normal">(optional — one per submission)</span>
             </h2>
             {photoPreview ? (
               <div className="relative rounded-xl overflow-hidden">
                 <img src={photoPreview} alt="Shelf photo" className="w-full object-cover max-h-52 rounded-xl" />
-                <button
-                  type="button"
-                  onClick={clearPhoto}
-                  className="absolute top-2 right-2 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center"
-                >
+                <button type="button" onClick={clearPhoto}
+                  className="absolute top-2 right-2 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center">
                   <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -458,34 +434,27 @@ export function GuestReportPage() {
                 </svg>
                 <p className="text-sm font-semibold text-abh-navy">Tap to add a photo</p>
                 <p className="text-xs text-gray-400 mt-0.5">Take a photo or choose from gallery</p>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={handlePhotoChange}
-                />
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoChange} />
               </label>
             )}
           </section>
         )}
 
         {/* ── Submit ── */}
-        {selectedStore && selectedSkuId && (
+        {selectedStore && (
           <div className="pt-2">
+            {validationError && (
+              <p className="text-sm text-abh-red mb-3 bg-red-50 rounded-xl px-4 py-2">{validationError}</p>
+            )}
             {submitError && (
-              <p className="text-sm text-red-600 mb-3 bg-red-50 rounded-xl px-4 py-2">
-                {submitError}
-              </p>
+              <p className="text-sm text-red-600 mb-3 bg-red-50 rounded-xl px-4 py-2">{submitError}</p>
             )}
             <button
               type="submit"
-              disabled={submitting || (!isOos && shelfUnits === '')}
-              className="w-full bg-abh-blue text-white font-bold rounded-xl py-4 text-sm
-                         disabled:opacity-50 disabled:cursor-not-allowed
-                         hover:bg-blue-700 active:bg-blue-800 transition-colors shadow"
+              disabled={submitting}
+              className="w-full bg-abh-blue text-white font-bold rounded-xl py-4 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 active:bg-blue-800 transition-colors shadow"
             >
-              {submitting ? 'Submitting...' : 'Submit Report'}
+              {submitting ? 'Submitting...' : `Submit Report${filledSkus.length > 0 ? ` · ${filledSkus.length} SKU${filledSkus.length !== 1 ? 's' : ''}` : ''}`}
             </button>
             <p className="text-xs text-gray-400 text-center mt-3">
               Reports are anonymous. Data is used by Pureau to improve shelf availability.

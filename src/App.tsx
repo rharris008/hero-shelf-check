@@ -11,6 +11,7 @@ import { VisitForm } from './components/visits/VisitForm'
 import { VisitHistory } from './components/visits/VisitHistory'
 import { AdminDashboard } from './components/admin/AdminDashboard'
 import { RepList } from './components/admin/RepList'
+import { GuestReportsDashboard } from './components/admin/GuestReportsDashboard'
 import { OnboardingModal, hasCompletedOnboarding } from './components/onboarding/OnboardingModal'
 import { TermsModal } from './components/terms/TermsModal'
 import { TermsPage } from './components/terms/TermsPage'
@@ -142,6 +143,14 @@ function AppRoutes() {
           element={
             <RequireAdmin>
               <RepList />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/guests"
+          element={
+            <RequireAdmin>
+              <GuestReportsDashboard />
             </RequireAdmin>
           }
         />

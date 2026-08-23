@@ -10,19 +10,6 @@ import type { StoreAvailabilitySummary, Retailer } from '../../types'
 
 // ---- Types --------------------------------------------------
 
-interface GuestReport {
-  id: string
-  created_at: string
-  store_id: string | null
-  store_name_manual: string | null
-  sku_id: string
-  sku_name: string
-  shelf_units: number | null
-  is_oos: boolean
-  comment: string | null
-  stores: { name: string; retailer: string; suburb: string | null; state: string } | null
-}
-
 type DrillLevel = 'national' | 'retailer' | 'state' | 'city' | 'store'
 
 interface DrillState {
@@ -384,67 +371,10 @@ function StoreCard({ rows }: { rows: StoreAvailabilitySummary[] }) {
   )
 }
 
-// ---- Guest Reports section ----------------------------------
-
-function GuestReportsSection({ reports }: { reports: GuestReport[] }) {
-  if (reports.length === 0) return null
-
-  function fmtDate(iso: string) {
-    const d = new Date(iso)
-    const local = new Date(d.toLocaleString('en-AU', { timeZone: 'Australia/Brisbane' }))
-    const dd = String(local.getDate()).padStart(2, '0')
-    const mm = String(local.getMonth() + 1).padStart(2, '0')
-    const hh = String(local.getHours()).padStart(2, '0')
-    const min = String(local.getMinutes()).padStart(2, '0')
-    return `${dd}/${mm} ${hh}:${min}`
-  }
-
-  return (
-    <div className="space-y-2">
-      <p className="text-[11px] text-gray-400 uppercase tracking-wide font-bold px-1">
-        Guest Reports ({reports.length})
-      </p>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {reports.map((r, i) => {
-          const storeName = r.stores?.name ?? r.store_name_manual ?? 'Unknown store'
-          const storeSub = r.stores
-            ? `${RETAILER_LABEL[r.stores.retailer] ?? r.stores.retailer}${r.stores.suburb ? ` · ${r.stores.suburb}` : ''}, ${r.stores.state}`
-            : ''
-          const isOOS = r.is_oos || r.shelf_units === 0
-          return (
-            <div key={r.id} className={`px-4 py-3 ${i > 0 ? 'border-t border-gray-100' : ''}`}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-2 flex-1 min-w-0">
-                  <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${isOOS ? 'bg-abh-red' : 'bg-abh-green'}`} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-abh-dktext truncate">{storeName}</p>
-                    {storeSub && <p className="text-[10px] text-gray-400">{storeSub}</p>}
-                    <p className="text-[10px] text-gray-500 mt-0.5">{r.sku_name}</p>
-                    {r.comment && (
-                      <p className="text-[10px] text-gray-500 italic mt-0.5">{r.comment}</p>
-                    )}
-                  </div>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className={`text-xs font-bold ${isOOS ? 'text-abh-red' : 'text-abh-green'}`}>
-                    {isOOS ? 'OOS' : `${r.shelf_units} on shelf`}
-                  </p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">{fmtDate(r.created_at)}</p>
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 // ---- Main component -----------------------------------------
 
 export function AdminDashboard() {
   const [allRows, setAllRows] = useState<StoreAvailabilitySummary[]>([])
-  const [guestReports, setGuestReports] = useState<GuestReport[]>([])
   const [loading, setLoading] = useState(true)
   const [drill, setDrill] = useState<DrillState>({
     level: 'national',
@@ -471,15 +401,6 @@ export function AdminDashboard() {
         offset += PAGE
       }
       setAllRows(collected)
-
-      // Load guest reports separately — shown as a distinct panel
-      const { data: gr } = await (supabase as any)
-        .from('guest_reports')
-        .select('id, created_at, store_id, store_name_manual, sku_id, sku_name, shelf_units, is_oos, comment, stores(name, retailer, suburb, state)')
-        .order('created_at', { ascending: false })
-        .limit(100)
-      if (gr) setGuestReports(gr as GuestReport[])
-
       setLoading(false)
     }
     loadAll()
@@ -769,7 +690,6 @@ export function AdminDashboard() {
             ))}
           </div>
 
-          <GuestReportsSection reports={guestReports} />
         </>
       )}
 
@@ -833,14 +753,9 @@ export function AdminDashboard() {
         </div>
       )}
 
-      {/* Store: SKU detail + guest reports for that store */}
+      {/* Store: SKU detail */}
       {drill.level === 'store' && storeRows.length > 0 && (
-        <>
-          <StoreCard rows={storeRows} />
-          <GuestReportsSection
-            reports={guestReports.filter(r => r.store_id === drill.storeId)}
-          />
-        </>
+        <StoreCard rows={storeRows} />
       )}
     </div>
   )
