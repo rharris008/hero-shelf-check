@@ -24,12 +24,17 @@ const RETAILER_LABEL: Record<string, string> = {
 
 function fmtDate(iso: string): string {
   const d = new Date(iso)
-  const local = new Date(d.toLocaleString('en-AU', { timeZone: 'Australia/Brisbane' }))
-  const dd = String(local.getDate()).padStart(2, '0')
-  const mm = String(local.getMonth() + 1).padStart(2, '0')
-  const hh = String(local.getHours()).padStart(2, '0')
-  const min = String(local.getMinutes()).padStart(2, '0')
-  return `${dd}/${mm} ${hh}:${min}`
+  if (isNaN(d.getTime())) return '?'
+  const parts = new Intl.DateTimeFormat('en-AU', {
+    timeZone: 'Australia/Brisbane',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d)
+  const get = (type: string) => parts.find((p: Intl.DateTimeFormatPart) => p.type === type)?.value ?? '00'
+  return `${get('day')}/${get('month')} ${get('hour')}:${get('minute')}`
 }
 
 function getStoreName(r: GuestReport): string {
